@@ -3,23 +3,29 @@
   "policy": "prefix_pure",
   "requests": 512,
   "errors": 0,
-  "wall_sec": 4.522768033,
-  "req_per_sec": 113.2050099107968,
-  "output_tok_per_sec": 1811.2801585727489,
-  "prompt_tok_per_sec": 386968.33161242073,
+  "wall_sec": 4.513870125,
+  "req_per_sec": 113.42816381984406,
+  "output_tok_per_sec": 1814.850621117505,
+  "prompt_tok_per_sec": 387736.23332815757,
   "ttft_ms": {
-    "mean": 187.58682421874997,
-    "p50": 21.973,
-    "p90": 659.804,
-    "p99": 1754.352
+    "mean": 186.283140625,
+    "p50": 23.523,
+    "p90": 660.976,
+    "p99": 1737.746
   },
   "e2e_ms": {
-    "mean": 382.6743085937501,
-    "p50": 222.502,
-    "p99": 1976.374
+    "mean": 382.4235996093749,
+    "p50": 220.311,
+    "p99": 1967.273
   },
-  "cache_hit_rate": 0.9460394659255569,
-  "scraped_cache_hit_rate": 0.9460394659255569,
+  "cache_hit_rate": 0.9460636010583988,
+  "scraped_cache_hit_rate": 0.9460636010583988,
+  "index_accuracy": {
+    "predicted_hit_rate": 0.8760434798725998,
+    "predicted_warm": 460,
+    "stale": 0,
+    "stale_rate": 0
+  },
   "per_backend": {
     ":8001": 76,
     ":8002": 192,
@@ -28,39 +34,39 @@
   },
   "imbalance_max_over_mean": 1.5,
   "route_reasons": {
-    "hash_affinity": 53,
-    "prefix_hit": 459
+    "hash_affinity": 52,
+    "prefix_hit": 460
   },
   "timeline": [
     {
       "sec": 0,
-      "ok": 64,
+      "ok": 66,
       "err": 0,
-      "ttft_p50_ms": 1279.457
+      "ttft_p50_ms": 1018.008
     },
     {
       "sec": 1,
-      "ok": 60,
+      "ok": 58,
       "err": 0,
-      "ttft_p50_ms": 68.699
+      "ttft_p50_ms": 78.809
     },
     {
       "sec": 2,
-      "ok": 165,
+      "ok": 168,
       "err": 0,
-      "ttft_p50_ms": 29.33
+      "ttft_p50_ms": 28.071
     },
     {
       "sec": 3,
-      "ok": 187,
+      "ok": 183,
       "err": 0,
-      "ttft_p50_ms": 15.307
+      "ttft_p50_ms": 15.34
     },
     {
       "sec": 4,
-      "ok": 36,
+      "ok": 37,
       "err": 0,
-      "ttft_p50_ms": 13.044
+      "ttft_p50_ms": 12.865
     }
   ]
 }

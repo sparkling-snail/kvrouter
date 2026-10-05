@@ -3,23 +3,29 @@
   "policy": "round_robin",
   "requests": 512,
   "errors": 0,
-  "wall_sec": 9.910949133999999,
-  "req_per_sec": 51.66003710417187,
-  "output_tok_per_sec": 826.5605936667499,
-  "prompt_tok_per_sec": 176574.91490864917,
+  "wall_sec": 10.054309625,
+  "req_per_sec": 50.923436724776614,
+  "output_tok_per_sec": 814.7749875964258,
+  "prompt_tok_per_sec": 174057.5002433347,
   "ttft_ms": {
-    "mean": 664.9210546874999,
-    "p50": 526.971,
-    "p90": 1555.384,
-    "p99": 2022.674
+    "mean": 687.4621718750003,
+    "p50": 646.478,
+    "p90": 1429.487,
+    "p99": 1929.546
   },
   "e2e_ms": {
-    "mean": 852.7613378906251,
-    "p50": 716.929,
-    "p99": 2254.474
+    "mean": 875.7935781249997,
+    "p50": 837.794,
+    "p99": 2128.746
   },
-  "cache_hit_rate": 0.8052639248010742,
-  "scraped_cache_hit_rate": 0.8052639248010742,
+  "cache_hit_rate": 0.8075299366638705,
+  "scraped_cache_hit_rate": 0.8075299366638705,
+  "index_accuracy": {
+    "predicted_hit_rate": 0,
+    "predicted_warm": 0,
+    "stale": 0,
+    "stale_rate": 0
+  },
   "per_backend": {
     ":8001": 128,
     ":8002": 128,
@@ -33,63 +39,63 @@
   "timeline": [
     {
       "sec": 0,
-      "ok": 59,
+      "ok": 66,
       "err": 0,
-      "ttft_p50_ms": 1313.909
+      "ttft_p50_ms": 1264.527
     },
     {
       "sec": 1,
-      "ok": 31,
+      "ok": 35,
       "err": 0,
-      "ttft_p50_ms": 880.812
+      "ttft_p50_ms": 900.206
     },
     {
       "sec": 2,
-      "ok": 56,
+      "ok": 53,
       "err": 0,
-      "ttft_p50_ms": 634.337
+      "ttft_p50_ms": 682.658
     },
     {
       "sec": 3,
-      "ok": 71,
+      "ok": 57,
       "err": 0,
-      "ttft_p50_ms": 531.339
+      "ttft_p50_ms": 826.849
     },
     {
       "sec": 4,
       "ok": 54,
       "err": 0,
-      "ttft_p50_ms": 625.128
+      "ttft_p50_ms": 704.35
     },
     {
       "sec": 5,
-      "ok": 55,
+      "ok": 36,
       "err": 0,
-      "ttft_p50_ms": 432.25
+      "ttft_p50_ms": 329.772
     },
     {
       "sec": 6,
-      "ok": 46,
+      "ok": 62,
       "err": 0,
-      "ttft_p50_ms": 406.714
+      "ttft_p50_ms": 370.587
     },
     {
       "sec": 7,
-      "ok": 66,
+      "ok": 73,
       "err": 0,
-      "ttft_p50_ms": 320.592
+      "ttft_p50_ms": 337.172
     },
     {
       "sec": 8,
-      "ok": 46,
+      "ok": 42,
       "err": 0,
-      "ttft_p50_ms": 291.259
+      "ttft_p50_ms": 494.455
     },
     {
       "sec": 9,
-      "ok": 28,
+      "ok": 34,
       "err": 0,
-      "ttft_p50_ms": 36.488
+      "ttft_p50_ms": 78.266
     }
   ]
 }

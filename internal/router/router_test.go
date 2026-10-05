@@ -72,6 +72,30 @@ func TestBoundedLoadSpills(t *testing.T) {
 	}
 }
 
+func TestWeightedTradesCacheForLoad(t *testing.T) {
+	pool := NewPool(urls(4), 1000)
+	h := chain("tenant ", 20)
+	owner := pool.Backends[2]
+	owner.index.Insert(h)
+
+	// Equal load: the cached backend wins.
+	w := NewWeighted(pool, 3, 2, 8)
+	if d := w.Pick(h, nil); d.Backend != owner || d.Reason != "weighted_hit" || d.Matched != 20 {
+		t.Fatalf("want weighted_hit on owner, got %s on %s (%d)", d.Reason, d.Backend.URL, d.Matched)
+	}
+	// Owner is the busiest. With prefix weight > load weight a full match
+	// still outscores an idle cold backend (3*1+2*0 > 3*0+2*1)...
+	owner.inflight.Store(10)
+	if d := w.Pick(h, nil); d.Backend != owner {
+		t.Fatalf("prefix-heavy weights should stay on owner, got %s", d.Backend.URL)
+	}
+	// ...and with load weight > prefix weight it moves.
+	w = NewWeighted(pool, 1, 2, 8)
+	if d := w.Pick(h, nil); d.Backend == owner || d.Reason != "weighted_cold" {
+		t.Fatalf("load-heavy weights should leave busy owner, got %s on %s", d.Reason, d.Backend.URL)
+	}
+}
+
 // Every prompt starts with the same chat-template header. Matching only that
 // header must not drag new tenants onto the backend that happens to hold it.
 func TestSharedHeaderDoesNotCountAsHit(t *testing.T) {
@@ -114,6 +138,24 @@ func TestUnhealthyAndPanicMode(t *testing.T) {
 	}
 	if d := pa.Pick(h, nil); d.Backend == nil || !strings.HasSuffix(d.Reason, "_panic") {
 		t.Fatalf("all-down should panic-route, got %+v", d)
+	}
+}
+
+// A backend whose /health is fine but whose requests keep failing must still
+// be ejected: good probes between failures must not reset the streak.
+func TestHealthyProbeDoesNotHideRequestFailures(t *testing.T) {
+	pool := NewPool(urls(2), 100)
+	b := pool.Backends[0]
+	for i := int64(0); i < pool.FailThreshold; i++ {
+		pool.MarkUp(b) // probe succeeds between every failed request
+		pool.ReportFailure(b, "http 503")
+	}
+	if b.Healthy() {
+		t.Fatalf("backend failing every request should be ejected despite passing probes")
+	}
+	pool.MarkUp(b)
+	if !b.Healthy() || b.consecFails.Load() != 0 {
+		t.Fatalf("restore should mark healthy and clear the streak")
 	}
 }
 

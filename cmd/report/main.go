@@ -20,9 +20,14 @@ type summary struct {
 	TTFT         map[string]float64 `json:"ttft_ms"`
 	CacheHit     float64            `json:"cache_hit_rate"`
 	Imbalance    float64            `json:"imbalance_max_over_mean"`
-	PerBackend   map[string]int     `json:"per_backend"`
-	Reasons      map[string]int     `json:"route_reasons"`
-	Timeline     []struct {
+	Index        *struct {
+		Predicted float64 `json:"predicted_hit_rate"`
+		Warm      int     `json:"predicted_warm"`
+		StaleRate float64 `json:"stale_rate"`
+	} `json:"index_accuracy"`
+	PerBackend map[string]int `json:"per_backend"`
+	Reasons    map[string]int `json:"route_reasons"`
+	Timeline   []struct {
 		Sec  int     `json:"sec"`
 		OK   int     `json:"ok"`
 		Err  int     `json:"err"`
@@ -31,7 +36,7 @@ type summary struct {
 	Errs map[string]int `json:"error_samples"`
 }
 
-var order = map[string]int{"round_robin": 0, "least_loaded": 1, "prefix_pure": 2, "prefix": 3}
+var order = map[string]int{"round_robin": 0, "least_loaded": 1, "prefix_pure": 2, "prefix": 3, "weighted": 4, "weighted_load": 5}
 
 func main() {
 	dir := "results"
@@ -78,6 +83,12 @@ func main() {
 				100*r.CacheHit, r.Imbalance, r.Errors, r.Requests)
 		}
 		fmt.Println()
+		for _, r := range rs {
+			if r.Index != nil && r.Index.Warm > 0 {
+				fmt.Printf("- `%s` router index: predicted hit %.1f%% vs actual %.1f%%; %d requests expected warm, %.1f%% stale\n",
+					r.Policy, 100*r.Index.Predicted, 100*r.CacheHit, r.Index.Warm, 100*r.Index.StaleRate)
+			}
+		}
 		for _, r := range rs {
 			if len(r.Reasons) > 0 {
 				fmt.Printf("- `%s` route reasons: %s\n", r.Policy, kv(r.Reasons))

@@ -25,6 +25,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/sparkling-snail/kvrouter/internal/prefix"
 )
 
 type result struct {
@@ -38,6 +40,19 @@ type result struct {
 	Reason     string
 	Err        string
 	AssistText string
+	// Router's belief vs reality: bytes of the prompt it expected to be
+	// cached (-1 if the router didn't say) and the prompt's length in bytes.
+	MatchedChars, PromptChars int
+}
+
+// IndexAccuracy compares the router's approximate prefix index with what
+// the backend actually reused (usage.prompt_tokens_details.cached_tokens).
+// Fractions are of the prompt, so bytes and tokens can be compared.
+type IndexAccuracy struct {
+	PredictedHitRate float64 `json:"predicted_hit_rate"` // token-weighted, like cache_hit_rate
+	PredictedWarm    int     `json:"predicted_warm"`     // requests the router expected to hit
+	Stale            int     `json:"stale"`              // ...where the backend reused < half the expected prefix
+	StaleRate        float64 `json:"stale_rate"`
 }
 
 type Summary struct {
@@ -53,6 +68,7 @@ type Summary struct {
 	E2Ems         map[string]float64 `json:"e2e_ms"`
 	CacheHitRate  float64            `json:"cache_hit_rate"`
 	ScrapedHit    *float64           `json:"scraped_cache_hit_rate,omitempty"`
+	Index         *IndexAccuracy     `json:"index_accuracy,omitempty"`
 	PerBackend    map[string]int     `json:"per_backend"`
 	Imbalance     float64            `json:"imbalance_max_over_mean"`
 	Reasons       map[string]int     `json:"route_reasons"`
@@ -198,7 +214,7 @@ func do(client *http.Client, url, model string, msgs []msg, maxTokens int, t0 ti
 		"temperature":    0, "ignore_eos": true,
 	})
 	start := time.Now()
-	r := result{Start: start.Sub(t0)}
+	r := result{Start: start.Sub(t0), MatchedChars: -1, PromptChars: len(prefix.ExtractPrompt(body))}
 	resp, err := client.Post(url+"/v1/chat/completions", "application/json", bytes.NewReader(body))
 	if err != nil {
 		r.Err = shortErr(err.Error())
@@ -211,6 +227,9 @@ func do(client *http.Client, url, model string, msgs []msg, maxTokens int, t0 ti
 		r.Backend = resp.Header.Get("X-Mock-Instance")
 	}
 	r.Reason = resp.Header.Get("X-Router-Reason")
+	if v, err := strconv.Atoi(resp.Header.Get("X-Router-Matched-Chars")); err == nil {
+		r.MatchedChars = v
+	}
 	if resp.StatusCode != http.StatusOK {
 		r.Err = "http " + strconv.Itoa(resp.StatusCode)
 		r.E2E = time.Since(start)
@@ -297,6 +316,9 @@ func summarize(rs []result, wall time.Duration) Summary {
 	}
 	var ttft, e2e []float64
 	var out, prompt, cached int
+	var idx *IndexAccuracy
+	var predictedTok float64
+	var idxPrompt int
 	bySec := map[int]*struct {
 		ok, err int
 		ttft    []float64
@@ -325,6 +347,21 @@ func summarize(rs []result, wall time.Duration) Summary {
 		out += r.OutTok
 		prompt += r.PromptTok
 		cached += r.CachedTok
+		if r.MatchedChars >= 0 && r.PromptChars > 0 && r.PromptTok > 0 {
+			if idx == nil {
+				idx = &IndexAccuracy{}
+			}
+			predicted := min(1, float64(r.MatchedChars)/float64(r.PromptChars))
+			actual := float64(r.CachedTok) / float64(r.PromptTok)
+			predictedTok += predicted * float64(r.PromptTok)
+			idxPrompt += r.PromptTok
+			if predicted > 0 {
+				idx.PredictedWarm++
+				if actual < predicted/2 {
+					idx.Stale++
+				}
+			}
+		}
 		key := r.Backend
 		if m := portRe.FindString(r.Backend); m != "" {
 			key = m
@@ -350,6 +387,13 @@ func summarize(rs []result, wall time.Duration) Summary {
 	s.PromptTokPerS = float64(prompt) / wall.Seconds()
 	if prompt > 0 {
 		s.CacheHitRate = float64(cached) / float64(prompt)
+	}
+	if idx != nil {
+		idx.PredictedHitRate = predictedTok / float64(idxPrompt)
+		if idx.PredictedWarm > 0 {
+			idx.StaleRate = float64(idx.Stale) / float64(idx.PredictedWarm)
+		}
+		s.Index = idx
 	}
 	if len(s.PerBackend) > 0 {
 		mx, tot := 0, 0
@@ -386,6 +430,10 @@ func print(s Summary) {
 		fmt.Printf(" (scraped %.1f%%)", 100**s.ScrapedHit)
 	}
 	fmt.Printf("  imbalance=%.2f  per-backend=%v\n", s.Imbalance, s.PerBackend)
+	if s.Index != nil {
+		fmt.Printf("router index: predicted hit=%.1f%%  predicted-warm=%d  stale=%d (%.1f%%)\n",
+			100*s.Index.PredictedHitRate, s.Index.PredictedWarm, s.Index.Stale, 100*s.Index.StaleRate)
+	}
 	if len(s.Reasons) > 0 {
 		fmt.Printf("route reasons=%v\n", s.Reasons)
 	}

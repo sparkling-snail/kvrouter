@@ -202,6 +202,72 @@ func (pa *PrefixAware) Pick(hashes []uint64, exclude map[int]bool) Decision {
 	return Decision{Backend: pick, Reason: withPanic(reason, panicMode)}
 }
 
+// ------------------------------------------------------------ weighted score
+
+// Weighted is the scoring approach used by the Kubernetes Gateway API
+// Inference Extension and llm-d: every backend gets
+//
+//	PrefixWeight * (matched blocks / prompt blocks)
+//	+ LoadWeight * (max_inflight - inflight) / (max_inflight - min_inflight)
+//
+// with the load term min-max normalized across candidates (1 if all equal),
+// and the highest score wins. Unlike PrefixAware there is no hard load cap,
+// no minimum match length and no rendezvous placement for cold prompts: the
+// cache/load trade-off lives entirely in the two weights. It is here to be
+// benchmarked against the bounded-load policy.
+type Weighted struct {
+	pool                     *Pool
+	PrefixWeight, LoadWeight float64
+	AffinityBlocks           int // only used to label decisions, not to score
+	rot                      atomic.Uint64
+}
+
+func NewWeighted(p *Pool, prefixWeight, loadWeight float64, affinityBlocks int) *Weighted {
+	if affinityBlocks <= 0 {
+		affinityBlocks = 8
+	}
+	return &Weighted{pool: p, PrefixWeight: prefixWeight, LoadWeight: loadWeight, AffinityBlocks: affinityBlocks}
+}
+
+func (w *Weighted) Name() string { return "weighted" }
+
+func (w *Weighted) Observe(b *Backend, hashes []uint64) { b.index.Insert(hashes) }
+
+func (w *Weighted) Pick(hashes []uint64, exclude map[int]bool) Decision {
+	cands, panicMode := w.pool.candidates(exclude)
+	if len(cands) == 0 {
+		return Decision{}
+	}
+	lo, hi := cands[0].Inflight(), cands[0].Inflight()
+	for _, c := range cands[1:] {
+		lo, hi = min(lo, c.Inflight()), max(hi, c.Inflight())
+	}
+	// Rotate the scan start so ties don't always go to backend 0.
+	start := int(w.rot.Add(1)) % len(cands)
+	var best *Backend
+	bestScore, bestLen := math.Inf(-1), 0
+	for i := range cands {
+		c := cands[(start+i)%len(cands)]
+		m, prefixScore := 0, 0.0
+		if len(hashes) > 0 {
+			m = c.index.MatchLen(hashes)
+			prefixScore = float64(m) / float64(len(hashes))
+		}
+		loadScore := 1.0
+		if hi > lo {
+			loadScore = float64(hi-c.Inflight()) / float64(hi-lo)
+		}
+		if s := w.PrefixWeight*prefixScore + w.LoadWeight*loadScore; s > bestScore {
+			best, bestScore, bestLen = c, s, m
+		}
+	}
+	reason := "weighted_cold"
+	if bestLen > 0 && bestLen >= min(w.AffinityBlocks, len(hashes)) {
+		reason = "weighted_hit"
+	}
+	return Decision{Backend: best, Reason: withPanic(reason, panicMode), Matched: bestLen}
+}
+
 func withPanic(reason string, panicMode bool) string {
 	if panicMode {
 		return reason + "_panic"

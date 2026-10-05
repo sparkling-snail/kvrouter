@@ -1,0 +1,145 @@
+{
+  "scenario": "drift_idx384",
+  "policy": "seed3",
+  "requests": 512,
+  "errors": 0,
+  "wall_sec": 17.688869917,
+  "req_per_sec": 28.944754662248894,
+  "output_tok_per_sec": 463.1160745959823,
+  "prompt_tok_per_sec": 98938.37244617009,
+  "ttft_ms": {
+    "mean": 1276.9428496093751,
+    "p50": 1274.261,
+    "p90": 2554.894,
+    "p99": 2894.243
+  },
+  "e2e_ms": {
+    "mean": 1465.9933496093743,
+    "p50": 1462.225,
+    "p99": 3085.651
+  },
+  "cache_hit_rate": 0.6408655922948755,
+  "index_accuracy": {
+    "predicted_hit_rate": 0.8131714589640593,
+    "predicted_warm": 433,
+    "stale": 111,
+    "stale_rate": 0.25635103926096997
+  },
+  "per_backend": {
+    ":8101": 141,
+    ":8102": 131,
+    ":8103": 108,
+    ":8104": 132
+  },
+  "imbalance_max_over_mean": 1.1015625,
+  "route_reasons": {
+    "hash_affinity": 51,
+    "load_fallback": 28,
+    "prefix_hit": 428,
+    "prefix_spill": 5
+  },
+  "timeline": [
+    {
+      "sec": 0,
+      "ok": 59,
+      "err": 0,
+      "ttft_p50_ms": 1299.775
+    },
+    {
+      "sec": 1,
+      "ok": 41,
+      "err": 0,
+      "ttft_p50_ms": 294.026
+    },
+    {
+      "sec": 2,
+      "ok": 38,
+      "err": 0,
+      "ttft_p50_ms": 845.505
+    },
+    {
+      "sec": 3,
+      "ok": 39,
+      "err": 0,
+      "ttft_p50_ms": 457.676
+    },
+    {
+      "sec": 4,
+      "ok": 48,
+      "err": 0,
+      "ttft_p50_ms": 670.645
+    },
+    {
+      "sec": 5,
+      "ok": 18,
+      "err": 0,
+      "ttft_p50_ms": 2465.024
+    },
+    {
+      "sec": 6,
+      "ok": 26,
+      "err": 0,
+      "ttft_p50_ms": 2560.642
+    },
+    {
+      "sec": 7,
+      "ok": 32,
+      "err": 0,
+      "ttft_p50_ms": 1341.904
+    },
+    {
+      "sec": 8,
+      "ok": 25,
+      "err": 0,
+      "ttft_p50_ms": 1949.149
+    },
+    {
+      "sec": 9,
+      "ok": 29,
+      "err": 0,
+      "ttft_p50_ms": 1867.301
+    },
+    {
+      "sec": 10,
+      "ok": 28,
+      "err": 0,
+      "ttft_p50_ms": 1087.212
+    },
+    {
+      "sec": 11,
+      "ok": 26,
+      "err": 0,
+      "ttft_p50_ms": 1520.749
+    },
+    {
+      "sec": 12,
+      "ok": 34,
+      "err": 0,
+      "ttft_p50_ms": 1221.159
+    },
+    {
+      "sec": 13,
+      "ok": 23,
+      "err": 0,
+      "ttft_p50_ms": 1081.999
+    },
+    {
+      "sec": 14,
+      "ok": 27,
+      "err": 0,
+      "ttft_p50_ms": 807.213
+    },
+    {
+      "sec": 15,
+      "ok": 13,
+      "err": 0,
+      "ttft_p50_ms": 1687.638
+    },
+    {
+      "sec": 16,
+      "ok": 6,
+      "err": 0,
+      "ttft_p50_ms": 486.874
+    }
+  ]
+}

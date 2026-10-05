@@ -3,23 +3,29 @@
   "policy": "prefix_pure",
   "requests": 512,
   "errors": 0,
-  "wall_sec": 5.191343857,
-  "req_per_sec": 98.62571505634712,
-  "output_tok_per_sec": 1578.011440901554,
-  "prompt_tok_per_sec": 337228.0951182618,
+  "wall_sec": 5.116242208,
+  "req_per_sec": 100.07344828190745,
+  "output_tok_per_sec": 1601.1751725105191,
+  "prompt_tok_per_sec": 342211.711021481,
   "ttft_ms": {
-    "mean": 220.190392578125,
-    "p50": 171.518,
-    "p90": 478.2,
-    "p99": 1259.033
+    "mean": 217.07442187499987,
+    "p50": 167.457,
+    "p90": 392.944,
+    "p99": 1267.685
   },
   "e2e_ms": {
-    "mean": 432.159107421875,
-    "p50": 403.838,
-    "p99": 1440.636
+    "mean": 428.04468164062484,
+    "p50": 396.014,
+    "p99": 1457.495
   },
-  "cache_hit_rate": 0.9477347776590294,
-  "scraped_cache_hit_rate": 0.9477347776590294,
+  "cache_hit_rate": 0.9477061841244021,
+  "scraped_cache_hit_rate": 0.9477061841244021,
+  "index_accuracy": {
+    "predicted_hit_rate": 0.87758195782653,
+    "predicted_warm": 461,
+    "stale": 0,
+    "stale_rate": 0
+  },
   "per_backend": {
     ":8001": 104,
     ":8002": 20,
@@ -34,39 +40,33 @@
   "timeline": [
     {
       "sec": 0,
-      "ok": 72,
+      "ok": 65,
       "err": 0,
-      "ttft_p50_ms": 710.692
+      "ttft_p50_ms": 966.583
     },
     {
       "sec": 1,
-      "ok": 108,
+      "ok": 117,
       "err": 0,
-      "ttft_p50_ms": 181.805
+      "ttft_p50_ms": 162.523
     },
     {
       "sec": 2,
-      "ok": 111,
+      "ok": 115,
       "err": 0,
-      "ttft_p50_ms": 232.141
+      "ttft_p50_ms": 219.487
     },
     {
       "sec": 3,
-      "ok": 145,
+      "ok": 141,
       "err": 0,
-      "ttft_p50_ms": 156.839
+      "ttft_p50_ms": 161.104
     },
     {
       "sec": 4,
-      "ok": 75,
+      "ok": 74,
       "err": 0,
-      "ttft_p50_ms": 27.836
-    },
-    {
-      "sec": 5,
-      "ok": 1,
-      "err": 0,
-      "ttft_p50_ms": 12.886
+      "ttft_p50_ms": 30.124
     }
   ]
 }

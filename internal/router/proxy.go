@@ -184,6 +184,9 @@ func (p *Proxy) try(w http.ResponseWriter, r *http.Request, d Decision, hashes [
 	h.Set("X-Router-Backend", b.URL)
 	h.Set("X-Router-Reason", d.Reason)
 	h.Set("X-Router-Matched-Blocks", strconv.Itoa(d.Matched))
+	// Prompt bytes the router believes are cached on b, so clients can check
+	// the index against the backend's reported cached_tokens.
+	h.Set("X-Router-Matched-Chars", strconv.Itoa(d.Matched*p.cfg.BlockChars))
 	h.Set("X-Router-Attempts", strconv.Itoa(attempt+1))
 	w.WriteHeader(resp.StatusCode)
 

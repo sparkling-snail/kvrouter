@@ -3,66 +3,71 @@
   "policy": "prefix",
   "requests": 512,
   "errors": 0,
-  "wall_sec": 4.497552692,
-  "req_per_sec": 113.83968906261343,
-  "output_tok_per_sec": 1821.435025001815,
-  "prompt_tok_per_sec": 389104.50190229807,
+  "wall_sec": 4.623995333,
+  "req_per_sec": 110.72675535505347,
+  "output_tok_per_sec": 1771.6280856808555,
+  "prompt_tok_per_sec": 378459.2920133036,
   "ttft_ms": {
-    "mean": 174.03369726562494,
-    "p50": 17.141,
-    "p90": 552.096,
-    "p99": 1375.156
+    "mean": 185.7660625,
+    "p50": 18.209,
+    "p90": 589.791,
+    "p99": 1366.059
   },
   "e2e_ms": {
-    "mean": 362.4560136718748,
-    "p50": 211.062,
-    "p99": 1575.898
+    "mean": 371.6375917968751,
+    "p50": 207.526,
+    "p99": 1558.285
   },
-  "cache_hit_rate": 0.9303310023096906,
-  "scraped_cache_hit_rate": 0.9303310023096906,
+  "cache_hit_rate": 0.9288168988007959,
+  "scraped_cache_hit_rate": 0.9288168988007959,
+  "index_accuracy": {
+    "predicted_hit_rate": 0.8559742749627526,
+    "predicted_warm": 449,
+    "stale": 0,
+    "stale_rate": 0
+  },
   "per_backend": {
-    ":8001": 143,
-    ":8002": 133,
-    ":8003": 94,
-    ":8004": 142
+    ":8001": 145,
+    ":8002": 131,
+    ":8003": 92,
+    ":8004": 144
   },
-  "imbalance_max_over_mean": 1.1171875,
+  "imbalance_max_over_mean": 1.1328125,
   "route_reasons": {
-    "hash_affinity": 38,
-    "load_fallback": 25,
-    "prefix_hit": 446,
-    "prefix_spill": 3
+    "hash_affinity": 39,
+    "load_fallback": 24,
+    "prefix_hit": 449
   },
   "timeline": [
     {
       "sec": 0,
-      "ok": 98,
+      "ok": 71,
       "err": 0,
-      "ttft_p50_ms": 375.707
+      "ttft_p50_ms": 646.974
     },
     {
       "sec": 1,
-      "ok": 113,
+      "ok": 141,
       "err": 0,
-      "ttft_p50_ms": 23.427
+      "ttft_p50_ms": 26.524
     },
     {
       "sec": 2,
-      "ok": 168,
+      "ok": 143,
       "err": 0,
-      "ttft_p50_ms": 16.242
+      "ttft_p50_ms": 17.386
     },
     {
       "sec": 3,
-      "ok": 121,
+      "ok": 141,
       "err": 0,
-      "ttft_p50_ms": 13.833
+      "ttft_p50_ms": 12.527
     },
     {
       "sec": 4,
-      "ok": 12,
+      "ok": 16,
       "err": 0,
-      "ttft_p50_ms": 12.521
+      "ttft_p50_ms": 12.945
     }
   ]
 }

@@ -71,9 +71,12 @@ func (p *Pool) MarkDown(b *Backend, why string) {
 	}
 }
 
+// MarkUp is called on a good health probe. It only clears the failure streak
+// when restoring an ejected backend: a backend that answers /health but fails
+// real requests must not have its streak wiped every probe interval.
 func (p *Pool) MarkUp(b *Backend) {
-	b.consecFails.Store(0)
 	if !b.healthy.Swap(true) {
+		b.consecFails.Store(0)
 		slog.Info("backend restored", "backend", b.URL)
 	}
 }
