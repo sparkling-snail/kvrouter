@@ -1,0 +1,60 @@
+{
+  "scenario": "multi_tenant",
+  "policy": "prefix_pure",
+  "requests": 512,
+  "errors": 0,
+  "wall_sec": 3.8174388439999998,
+  "req_per_sec": 134.12133656174427,
+  "output_tok_per_sec": 2145.9413849879084,
+  "prompt_tok_per_sec": 458491.69339043903,
+  "ttft_ms": {
+    "mean": 141.53405078124996,
+    "p50": 16.604,
+    "p90": 507.978,
+    "p99": 1358.846
+  },
+  "e2e_ms": {
+    "mean": 329.01461718750016,
+    "p50": 206.696,
+    "p99": 1552.69
+  },
+  "cache_hit_rate": 0.9459601522970249,
+  "scraped_cache_hit_rate": 0.9459601522970249,
+  "per_backend": {
+    ":8001": 148,
+    ":8002": 100,
+    ":8003": 156,
+    ":8004": 108
+  },
+  "imbalance_max_over_mean": 1.21875,
+  "route_reasons": {
+    "hash_affinity": 48,
+    "prefix_hit": 464
+  },
+  "timeline": [
+    {
+      "sec": 0,
+      "ok": 60,
+      "err": 0,
+      "ttft_p50_ms": 1009.901
+    },
+    {
+      "sec": 1,
+      "ok": 129,
+      "err": 0,
+      "ttft_p50_ms": 17.505
+    },
+    {
+      "sec": 2,
+      "ok": 225,
+      "err": 0,
+      "ttft_p50_ms": 15.789
+    },
+    {
+      "sec": 3,
+      "ok": 98,
+      "err": 0,
+      "ttft_p50_ms": 13.652
+    }
+  ]
+}

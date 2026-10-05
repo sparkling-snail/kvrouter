@@ -1,0 +1,101 @@
+{
+  "scenario": "failover",
+  "policy": "prefix",
+  "requests": 1536,
+  "errors": 3,
+  "wall_sec": 10.066561232,
+  "req_per_sec": 152.28636320482872,
+  "output_tok_per_sec": 2436.5818112772595,
+  "prompt_tok_per_sec": 520532.0743833528,
+  "ttft_ms": {
+    "mean": 107.07496934116114,
+    "p50": 19.492,
+    "p90": 323.615,
+    "p99": 1351.407
+  },
+  "e2e_ms": {
+    "mean": 300.8731161121976,
+    "p50": 214.506,
+    "p99": 1544.978
+  },
+  "cache_hit_rate": 0.9526745201497414,
+  "scraped_cache_hit_rate": 0.9540651987862756,
+  "per_backend": {
+    ":8001": 480,
+    ":8002": 118,
+    ":8003": 495,
+    ":8004": 440
+  },
+  "imbalance_max_over_mean": 1.2915851272015655,
+  "route_reasons": {
+    "hash_affinity": 54,
+    "load_fallback": 21,
+    "prefix_hit": 1456,
+    "prefix_spill": 2
+  },
+  "timeline": [
+    {
+      "sec": 0,
+      "ok": 62,
+      "err": 0,
+      "ttft_p50_ms": 1002.232
+    },
+    {
+      "sec": 1,
+      "ok": 104,
+      "err": 3,
+      "ttft_p50_ms": 22.912
+    },
+    {
+      "sec": 2,
+      "ok": 116,
+      "err": 0,
+      "ttft_p50_ms": 51.169
+    },
+    {
+      "sec": 3,
+      "ok": 159,
+      "err": 0,
+      "ttft_p50_ms": 22.439
+    },
+    {
+      "sec": 4,
+      "ok": 182,
+      "err": 0,
+      "ttft_p50_ms": 22.42
+    },
+    {
+      "sec": 5,
+      "ok": 215,
+      "err": 0,
+      "ttft_p50_ms": 18.399
+    },
+    {
+      "sec": 6,
+      "ok": 185,
+      "err": 0,
+      "ttft_p50_ms": 19.962
+    },
+    {
+      "sec": 7,
+      "ok": 188,
+      "err": 0,
+      "ttft_p50_ms": 15.182
+    },
+    {
+      "sec": 8,
+      "ok": 215,
+      "err": 0,
+      "ttft_p50_ms": 15.074
+    },
+    {
+      "sec": 9,
+      "ok": 107,
+      "err": 0,
+      "ttft_p50_ms": 13.617
+    }
+  ],
+  "error_samples": {
+    "stream truncated": 3
+  }
+}

@@ -1,0 +1,45 @@
+# Two vLLM instances (one GPU each) behind kvrouter.
+# NOT exercised in this repo's results (needs NVIDIA GPUs + nvidia-container-toolkit).
+#   MODEL=Qwen/Qwen2.5-7B-Instruct docker compose -f deploy/docker-compose.vllm.yml up
+# Add more vllm-N services and append them to --backends to scale out.
+x-vllm: &vllm
+  image: vllm/vllm-openai:latest
+  ipc: host
+  environment:
+    - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
+  volumes:
+    - ${HOME}/.cache/huggingface:/root/.cache/huggingface
+  healthcheck:
+    test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+    interval: 10s
+    retries: 60
+
+services:
+  vllm-0:
+    <<: *vllm
+    command: ["--model", "${MODEL:-Qwen/Qwen2.5-7B-Instruct}", "--enable-prefix-caching",
+              "--enable-prompt-tokens-details", "--gpu-memory-utilization", "0.90"]
+    ports: ["8001:8000"]
+    deploy:
+      resources:
+        reservations:
+          devices: [{driver: nvidia, device_ids: ["0"], capabilities: [gpu]}]
+
+  vllm-1:
+    <<: *vllm
+    command: ["--model", "${MODEL:-Qwen/Qwen2.5-7B-Instruct}", "--enable-prefix-caching",
+              "--enable-prompt-tokens-details", "--gpu-memory-utilization", "0.90"]
+    ports: ["8002:8000"]
+    deploy:
+      resources:
+        reservations:
+          devices: [{driver: nvidia, device_ids: ["1"], capabilities: [gpu]}]
+
+  router:
+    build: {context: .., dockerfile: deploy/Dockerfile}
+    command: ["-listen", ":9000", "-policy", "prefix",
+              "-backends", "http://vllm-0:8000,http://vllm-1:8000"]
+    ports: ["9000:9000"]
+    depends_on:
+      vllm-0: {condition: service_healthy}
+      vllm-1: {condition: service_healthy}

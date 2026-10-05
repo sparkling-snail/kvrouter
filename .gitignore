@@ -1,0 +1,5 @@
+bin/
+logs/
+results/*.json
+results/*.prom
+results/RESULTS.md
