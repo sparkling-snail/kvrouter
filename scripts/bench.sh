@@ -24,6 +24,9 @@ MODEL=${MODEL:-mock}
 MOCK_ARGS=${MOCK_ARGS:-}
 BENCH_ARGS=${BENCH_ARGS:-}
 SEED=${SEED:-42}
+# Goodput SLOs; anything in BENCH_ARGS comes later on the command line and wins.
+SLO_TTFT=${SLO_TTFT:-500ms}
+SLO_TPOT=${SLO_TPOT:-25ms}
 OUT=${OUT:-results}
 mkdir -p bin "$OUT" logs
 [[ -n "${SKIP_BUILD:-}" ]] || go build -o bin/ ./cmd/...
@@ -57,7 +60,8 @@ run() { # scenario label "router args" bench-args...
   ./bin/router -listen :9000 -backends "$BACKENDS" $rargs 2>"logs/router_${scenario}_${label}.log" &
   local rp=$!; pids="$pids $rp"; sleep 0.3
   ./bin/bench -url http://127.0.0.1:9000 -model "$MODEL" -scenario "$scenario" -policy "$label" \
-      -seed "$SEED" -scrape "$BACKENDS" -out "$OUT/${scenario}_${label}.json" $BENCH_ARGS "$@"
+      -seed "$SEED" -scrape "$BACKENDS" -out "$OUT/${scenario}_${label}.json" \
+      -slo-ttft "$SLO_TTFT" -slo-tpot "$SLO_TPOT" $BENCH_ARGS "$@"
   curl -fsS 127.0.0.1:9000/metrics > "$OUT/${scenario}_${label}.router.prom" || true
   kill "$rp"; wait "$rp" 2>/dev/null || true
   echo

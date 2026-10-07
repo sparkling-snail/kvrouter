@@ -18,6 +18,13 @@ type summary struct {
 	ReqPerSec    float64            `json:"req_per_sec"`
 	OutTokPerSec float64            `json:"output_tok_per_sec"`
 	TTFT         map[string]float64 `json:"ttft_ms"`
+	ITL          map[string]float64 `json:"itl_ms"`
+	Goodput      *struct {
+		TTFT      float64 `json:"slo_ttft_ms"`
+		TPOT      float64 `json:"slo_tpot_ms"`
+		Rate      float64 `json:"rate"`
+		ReqPerSec float64 `json:"req_per_sec"`
+	} `json:"goodput"`
 	CacheHit     float64            `json:"cache_hit_rate"`
 	Imbalance    float64            `json:"imbalance_max_over_mean"`
 	Index        *struct {
@@ -71,16 +78,26 @@ func main() {
 			}
 		}
 		fmt.Printf("### %s\n\n", sc)
-		fmt.Println("| policy | TTFT p50 | TTFT p90 | TTFT p99 | req/s | out tok/s | cache hit | load imbalance | errors |")
-		fmt.Println("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+		for _, r := range rs {
+			if g := r.Goodput; g != nil {
+				fmt.Printf("Goodput SLO: TTFT <= %.0f ms, TPOT <= %.0f ms (0 = none).\n\n", g.TTFT, g.TPOT)
+				break
+			}
+		}
+		fmt.Println("| policy | TTFT p50 | TTFT p90 | TTFT p99 | ITL p50 | ITL p99 | req/s | goodput | out tok/s | cache hit | load imbalance | errors |")
+		fmt.Println("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
 		for _, r := range rs {
 			rel := ""
 			if base != nil && r.Policy != "round_robin" && base.ReqPerSec > 0 {
 				rel = fmt.Sprintf(" (%.2fx)", r.ReqPerSec/base.ReqPerSec)
 			}
-			fmt.Printf("| %s | %.0f ms | %.0f ms | %.0f ms | %.1f%s | %.0f | %.1f%% | %.2f | %d/%d |\n",
-				r.Policy, r.TTFT["p50"], r.TTFT["p90"], r.TTFT["p99"], r.ReqPerSec, rel, r.OutTokPerSec,
-				100*r.CacheHit, r.Imbalance, r.Errors, r.Requests)
+			good := "–"
+			if g := r.Goodput; g != nil {
+				good = fmt.Sprintf("%.1f (%.0f%%)", g.ReqPerSec, 100*g.Rate)
+			}
+			fmt.Printf("| %s | %.0f ms | %.0f ms | %.0f ms | %.1f ms | %.1f ms | %.1f%s | %s | %.0f | %.1f%% | %.2f | %d/%d |\n",
+				r.Policy, r.TTFT["p50"], r.TTFT["p90"], r.TTFT["p99"], r.ITL["p50"], r.ITL["p99"], r.ReqPerSec, rel, good,
+				r.OutTokPerSec, 100*r.CacheHit, r.Imbalance, r.Errors, r.Requests)
 		}
 		fmt.Println()
 		for _, r := range rs {

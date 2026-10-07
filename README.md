@@ -15,50 +15,51 @@ turn one instance into a hot spot.
                         └───────────────────────────────────────────────────────────────┘
 ```
 
-Stdlib only, no dependencies. ~1,900 lines of Go (router, mock server, load generator) plus ~310 lines of tests; a small Python script turns the results into the tables and chart below.
+Stdlib only, no dependencies. ~2,000 lines of Go (router, mock server, load generator) plus ~310 lines of tests; a small Python script turns the results into the tables and chart below.
 
 ## Results (4 instances, mock vLLM, mean of 3 seeds)
 
 ![Throughput and TTFT p50 by policy, multi-tenant and hot-tenant scenarios](docs/results.png)
 
 **Multi-tenant** — 16 tenants with ~3k-token system prompts, 128 conversations × 4 turns, 48 concurrent.
+Goodput is requests per second that met both SLOs (TTFT ≤ 500 ms, time per output token ≤ 25 ms), with the share of requests that met them in brackets.
 
-| policy | TTFT p50 | TTFT p90 | TTFT p99 | req/s | vs RR | cache hit | load imbalance |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| round_robin | 1087 ms | 2485 ms | 3420 ms | 27.3 | 1.00× | 65.6% | 1.00 |
-| least_loaded | 450 ms | 1684 ms | 2942 ms | 47.7 | 1.75× | 79.3% | 1.16 |
-| prefix_pure (no load bound) | 24 ms | 628 ms | 1682 ms | 117.3 | 4.30× | 94.6% | 1.51 |
-| **prefix** (bounded load) | **16 ms** | 656 ms | 1844 ms | 112.9 | 4.14× | 93.1% | 1.22 |
-| weighted 3:2 (prefix:load) | 20 ms | 1149 ms | 2573 ms | 93.3 | 3.42× | 90.6% | 1.13 |
-| weighted 1:2 | 235 ms | 1537 ms | 2640 ms | 57.1 | 2.09× | 83.2% | 1.19 |
+| policy | TTFT p50 | TTFT p90 | TTFT p99 | ITL p50 | ITL p99 | req/s | vs RR | goodput | cache hit | load imbalance |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| round_robin | 1152 ms | 2950 ms | 4036 ms | 12.5 ms | 26.0 ms | 26.0 | 1.00× | 7.9 (30%) | 64.8% | 1.00 |
+| least_loaded | 568 ms | 1759 ms | 2578 ms | 12.4 ms | 29.5 ms | 45.0 | 1.73× | 19.7 (44%) | 77.3% | 1.18 |
+| prefix_pure (no load bound) | 37 ms | 638 ms | 1692 ms | 12.6 ms | 43.0 ms | 114.4 | 4.40× | 100.9 (88%) | 94.6% | 1.51 |
+| **prefix** (bounded load) | **24 ms** | 639 ms | 1667 ms | 12.3 ms | 45.4 ms | 108.6 | 4.18× | 93.4 (86%) | 93.1% | 1.19 |
+| weighted 3:2 (prefix:load) | 37 ms | 1247 ms | 2667 ms | 12.2 ms | 54.1 ms | 86.9 | 3.34× | 72.4 (83%) | 90.1% | 1.16 |
+| weighted 1:2 | 256 ms | 1413 ms | 2664 ms | 12.3 ms | 36.7 ms | 63.7 | 2.45× | 41.8 (66%) | 85.1% | 1.20 |
 
 **Hot tenant** — same, but 50% of conversations belong to one tenant.
 
-| policy | TTFT p50 | TTFT p90 | TTFT p99 | req/s | vs RR | cache hit | load imbalance |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| round_robin | 581 ms | 1372 ms | 1853 ms | 50.8 | 1.00× | 80.9% | 1.00 |
-| least_loaded | 281 ms | 1013 ms | 1878 ms | 71.3 | 1.40× | 86.7% | 1.22 |
-| prefix_pure (no load bound) | 212 ms | 619 ms | 1529 ms | 91.0 | 1.79× | 94.6% | **2.74** |
-| **prefix** (bounded load) | **18 ms** | 632 ms | 1585 ms | **113.6** | **2.24×** | 93.0% | 1.32 |
-| weighted 3:2 (prefix:load) | 18 ms | 668 ms | 1825 ms | 113.2 | 2.23× | 92.7% | 1.23 |
-| weighted 1:2 | 23 ms | 949 ms | 1707 ms | 84.5 | 1.66× | 89.7% | 1.11 |
+| policy | TTFT p50 | TTFT p90 | TTFT p99 | ITL p50 | ITL p99 | req/s | vs RR | goodput | cache hit | load imbalance |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| round_robin | 579 ms | 1484 ms | 1958 ms | 12.3 ms | 37.9 ms | 49.7 | 1.00× | 23.5 (47%) | 80.6% | 1.00 |
+| least_loaded | 291 ms | 985 ms | 1921 ms | 12.2 ms | 42.0 ms | 72.2 | 1.45× | 50.8 (70%) | 87.1% | 1.19 |
+| prefix_pure (no load bound) | 208 ms | 617 ms | 1521 ms | 14.9 ms | 41.0 ms | 91.5 | 1.84× | 80.1 (87%) | 94.7% | **2.74** |
+| **prefix** (bounded load) | **26 ms** | 578 ms | 1600 ms | 12.5 ms | 43.4 ms | **112.7** | **2.27×** | **98.7 (88%)** | 93.3% | 1.26 |
+| weighted 3:2 (prefix:load) | 31 ms | 717 ms | 1858 ms | 12.2 ms | 53.2 ms | 105.3 | 2.12× | 89.4 (85%) | 92.5% | 1.16 |
+| weighted 1:2 | 73 ms | 965 ms | 1842 ms | 12.2 ms | 49.3 ms | 84.2 | 1.70× | 63.2 (75%) | 89.6% | 1.20 |
 
 `weighted` is the scoring approach used by the Gateway API Inference Extension
 and llm-d (see [Design](#comparison-policy-weighted-scoring--policy-weighted)),
 run with two weightings.
 
 **Failover** — prefix policy, `kill -9` one of four backends ~2 s into the run, restart it ~4 s later.
-Across 3 runs: **14 errors in 4,599 requests**, all streams that were mid-flight on the
+Across 3 runs: **8 errors in 4,596 requests** (4, 0 and 4 per run), all streams that were mid-flight on the
 killed process (`kvrouter_midstream_errors_total`). Every request that arrived after the
-crash succeeded (0–14 transparent retries per run). The backend was ejected on the first
+crash succeeded (2–12 transparent retries per run). The backend was ejected on the first
 broken connection and restored on its first good probe, then took traffic again with a
 reset index. The cost of a crash shows up as a short TTFT bump rather than errors: in
-two of the three runs p50 TTFT rises to ~190–270 ms for about a second after the kill, because the dead
+two of the three runs p50 TTFT rises to ~140–330 ms for about a second after the kill, because the dead
 instance's tenants get re-placed and have to be prefilled cold on their new owners.
 
 Per-seed tables and raw JSON: [`results/seed{1,2,3}/`](results/). Spread across
 seeds is small for p50 and hit rate; `prefix_pure` throughput varies most
-(102–136 req/s) because its balance depends on where rendezvous hashing happens
+(78–131 req/s) because its balance depends on where rendezvous hashing happens
 to land 16 tenants.
 
 ### What the numbers say
@@ -67,29 +68,35 @@ to land 16 tenants.
   tokens of cache per instance, round-robin makes every instance try to cache
   every tenant, so they thrash. Affinity routing partitions tenants, so the
   *aggregate* cache across the fleet is usable. That's also why TTFT p50 drops
-  ~70×: almost every request only prefills its new turn.
+  ~50×: almost every request only prefills its new turn.
 - **Least-loaded is the honest baseline**, not round-robin. It already
-  improves throughput 1.4–1.75×. Prefix-aware is still 1.6–2.4× its throughput.
+  improves throughput 1.45–1.7×. Prefix-aware is still 1.6–2.4× its throughput.
+- **Goodput widens the gap.** Under the SLO, `prefix` serves 4.7× the goodput of
+  `least_loaded` on the 16-tenant workload (93 vs 20 req/s), against 2.4× on raw
+  throughput, because most of least-loaded's requests miss the TTFT target.
 - **The load bound earns its keep under skew.** Pure affinity pins the hot
-  tenant to one instance (2.7× imbalance, p50 TTFT 212 ms). Bounded load
+  tenant to one instance (2.7× imbalance, p50 TTFT 208 ms). Bounded load
   spills it onto a second instance, which then caches that tenant too —
-  replicating the hot prefix — and p50 falls to 18 ms with +25% throughput.
-  Under uniform load it costs ~1.5 pts of hit rate and ~4% throughput, within
+  replicating the hot prefix — and p50 falls to 26 ms with +23% throughput and goodput.
+  Under uniform load it costs ~1.5 pts of hit rate and ~5% throughput, within
   `prefix_pure`'s seed-to-seed spread.
-- **Weighted scoring matches it under skew but not under uniform load.** With
-  prefix weight 3 and load weight 2, `weighted` ties `prefix` on the hot tenant
-  (113 req/s, 18 ms p50). On the 16-tenant workload it's 17% slower with a 75%
-  higher p90. The difference is cold placement: when no backend has a prompt
+- **Weighted scoring nearly matches it under skew but not under uniform load.** With
+  prefix weight 3 and load weight 2, `weighted` comes within 7% of `prefix` on the hot tenant
+  (105 vs 113 req/s, inside the seed-to-seed spread). On the 16-tenant workload it's 20% slower with
+  nearly twice the p90. The difference is cold placement: when no backend has a prompt
   cached, `weighted` has only the load term to go on, so a new tenant's first
   conversations land on whichever instances are idle, and the hit rate drops
-  (90.6% vs 93.1%). `prefix` hashes cold prompts to one owner. Shifting the
+  (90.1% vs 93.1%). `prefix` hashes cold prompts to one owner. Shifting the
   weights toward load (1:2) is worse on both workloads. The bounded-load policy
   needs no weight tuning to get both cases right.
 - **Trade-off visible in p99:** pure affinity has slightly better p99 in the
   hot-tenant case. Each spill forces one cold 3k-token prefill on the new
   replica. p99 for all prefix policies is dominated by the cold-start burst
   at t=0 (48 cold conversations at once; see the failover timeline in
-  `results/seed*/RESULTS.md` — p50 TTFT is ~1 s in second 0 and settles to ~15–30 ms once warm).
+  `results/seed*/RESULTS.md` — p50 TTFT is ~0.8–1.3 s in second 0 and settles to ~15–60 ms once warm).
+- **ITL says little here.** It's ~12 ms at p50 for every policy because the mock's decode
+  step only slows with batch size; prefills never stall decoding, as they do in real vLLM.
+  Treat the ITL columns as a placeholder until the real-GPU run (`scripts/gpu_run.sh`).
 
 ### How accurate is the router's index?
 
@@ -99,7 +106,7 @@ expected to be cached (`X-Router-Matched-Chars`) and the benchmark compares that
 with the `cached_tokens` the backend actually reused. At the default 32k-token
 cache the guess is rarely tested: for `prefix`, `prefix_pure` and `weighted 3:2`
 under 1% of requests the router expected to hit were stale (`weighted 1:2`,
-which spreads tenants across more instances, reaches 2–9%). With the mock's cache cut to 12k tokens per instance
+which spreads tenants across more instances, reaches up to 4%). With the mock's cache cut to 12k tokens per instance
 (`scripts/index_drift.sh`, prefix policy, multi-tenant, 3 seeds):
 
 | router index size | predicted hit | actual hit | expected-warm requests that were stale |
@@ -207,7 +214,8 @@ internal/router policies, proxy, health, metrics (+ tests)
 scripts/bench.sh        full comparison + failover run (bash 3.2+, works on stock macOS)
 scripts/index_drift.sh  router-index accuracy under KV-cache memory pressure
 scripts/summarize.py    mean across seeds → README tables + docs/results.png
-deploy/                 Dockerfile, docker-compose for real vLLM
+scripts/gpu_run.sh      the same comparison against real vLLM on one GPU host
+deploy/                 Dockerfile, docker-compose for 4 pinned vLLM servers
 ```
 
 ## Run it
@@ -226,27 +234,32 @@ curl -s localhost:9000/metrics | grep route_decisions
 ```
 
 Fault injection on the mock: `POST /admin/fault?rate=0.2` (random 503s),
-`POST /admin/down` / `/admin/up` (fail health checks), `POST /reset` (drop cache).
+`POST /admin/down` / `/admin/up` (fail health checks), `POST /reset` or
+`/reset_prefix_cache` (drop cache).
 
 ## Running against real vLLM
 
-`deploy/docker-compose.vllm.yml` starts vLLM instances (one GPU each) behind
-the router. **It has not been run as part of this repo's results — that needs
-GPUs.** Then:
+**Not yet run — that needs GPUs.** On a host with 2–4 NVIDIA GPUs, docker and
+nvidia-container-toolkit:
 
 ```bash
-BACKENDS=http://gpu-host:8001,http://gpu-host:8002 MODEL=Qwen/Qwen2.5-7B-Instruct NO_MOCK=1 \
-BENCH_ARGS="-sys-tokens 2000 -concurrency 32" ./scripts/bench.sh
+HF_TOKEN=hf_... scripts/gpu_run.sh                     # 4 GPUs, Qwen2.5-7B-Instruct
+NUM_GPUS=2 MODEL=meta-llama/Llama-3.1-8B-Instruct scripts/gpu_run.sh
 ```
 
-Notes for the real thing:
-- Start vLLM with `--enable-prompt-tokens-details` so streamed usage includes
-  `cached_tokens`; otherwise rely on the scraped `vllm:prefix_cache_*` counters.
-- Reset caches between policies (restart, or vLLM's `/reset_prefix_cache`
-  endpoint when the server runs in dev mode).
-- Size the workload so total distinct prefixes exceed one instance's KV cache
-  but fit the fleet's. That's the regime this router is for. If everything fits
-  on every instance, round-robin hit rates converge with prefix routing.
+It checks the host, starts that many vLLM servers from
+`deploy/docker-compose.vllm.yml` (pinned to v0.31.0), waits for them to be
+healthy, then runs every policy with caches reset in between
+(`/reset_prefix_cache`, enabled by `VLLM_SERVER_DEV_MODE=1`). Results land in
+`results/gpu/<timestamp>/` with a `meta.json` recording the git commit, model,
+vLLM version, GPUs and benchmark arguments. Go is optional on the host.
+
+The workload is sized from the KV-cache capacity vLLM logs at startup: distinct
+prefixes come to about half the fleet's cache, more than one server holds.
+That's the regime this router is for. If everything fits on every instance,
+round-robin hit rates converge with prefix routing. Override with `TENANTS`,
+`SYS_TOKENS`, `CONVS`, `MAX_TOKENS`, `SLO_TTFT` and `SLO_TPOT`. The failover
+scenario runs only against the mock.
 
 ## Limitations and next steps
 

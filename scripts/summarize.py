@@ -42,22 +42,28 @@ def mean(xs):
 def table(runs, scenario):
     base = mean([s["req_per_sec"] for s in runs[(scenario, "round_robin")]])
     rows = [
-        "| policy | TTFT p50 | TTFT p90 | TTFT p99 | req/s | vs RR | cache hit | load imbalance |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
+        "| policy | TTFT p50 | TTFT p90 | TTFT p99 | ITL p50 | ITL p99 | req/s | vs RR | goodput | cache hit | load imbalance |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for p in POLICIES:
         rs = runs.get((scenario, p))
         if not rs:
             continue
         rps = mean([s["req_per_sec"] for s in rs])
+        good = [s["goodput"] for s in rs if s.get("goodput")]
         rows.append(
-            "| {} | {:.0f} ms | {:.0f} ms | {:.0f} ms | {:.1f} | {:.2f}× | {:.1f}% | {:.2f} |".format(
+            "| {} | {:.0f} ms | {:.0f} ms | {:.0f} ms | {:.1f} ms | {:.1f} ms | {:.1f} | {:.2f}× | {} | {:.1f}% | {:.2f} |".format(
                 LABELS[p],
                 mean([s["ttft_ms"]["p50"] for s in rs]),
                 mean([s["ttft_ms"]["p90"] for s in rs]),
                 mean([s["ttft_ms"]["p99"] for s in rs]),
+                mean([s["itl_ms"]["p50"] for s in rs if "itl_ms" in s]),
+                mean([s["itl_ms"]["p99"] for s in rs if "itl_ms" in s]),
                 rps,
                 rps / base,
+                "{:.1f} ({:.0f}%)".format(mean([g["req_per_sec"] for g in good]), 100 * mean([g["rate"] for g in good]))
+                if good
+                else "–",
                 100 * mean([s["cache_hit_rate"] for s in rs]),
                 mean([s["imbalance_max_over_mean"] for s in rs]),
             )
