@@ -10,6 +10,9 @@
 #
 # To run against real vLLM instead, skip the mocks and set BACKENDS, e.g.
 #   BACKENDS=http://gpu1:8000,http://gpu2:8000 MODEL=meta-llama/Llama-3.1-8B-Instruct NO_MOCK=1 scripts/bench.sh
+# The servers must run with VLLM_SERVER_DEV_MODE=1 so caches can be reset between
+# policies; scripts/gpu_run.sh sets all of this up on a GPU host.
+# Without Go on the host, build bin/ first and set SKIP_BUILD=1.
 #
 # Written for bash 3.2 (macOS default): no associative arrays, no empty "${arr[@]}" under set -u.
 set -euo pipefail
@@ -23,7 +26,7 @@ BENCH_ARGS=${BENCH_ARGS:-}
 SEED=${SEED:-42}
 OUT=${OUT:-results}
 mkdir -p bin "$OUT" logs
-go build -o bin/ ./cmd/...
+[[ -n "${SKIP_BUILD:-}" ]] || go build -o bin/ ./cmd/...
 
 pids=""
 cleanup() { [[ -n $pids ]] && kill $pids 2>/dev/null || true; }
@@ -35,9 +38,17 @@ if [[ -z "${NO_MOCK:-}" ]]; then
   sleep 0.5
 fi
 
+# Cold caches for every policy. vLLM refuses ({"success": false}) while blocks
+# are still held, e.g. by requests the previous run's client abandoned.
 reset_backends() {
-  [[ -n "${NO_MOCK:-}" ]] && return   # real vLLM: restart servers or POST /reset_prefix_cache yourself
-  for p in $PORTS; do curl -fsS -XPOST "127.0.0.1:$p/reset" >/dev/null; done
+  local b i
+  for b in ${BACKENDS//,/ }; do
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+      curl -fsS -XPOST "$b/reset_prefix_cache" 2>/dev/null | grep -q '"success": *true' && continue 2
+      sleep 1
+    done
+    echo "cache reset failed on $b (vLLM needs VLLM_SERVER_DEV_MODE=1)" >&2; exit 1
+  done
 }
 
 run() { # scenario label "router args" bench-args...
@@ -73,4 +84,4 @@ if [[ -z "${NO_MOCK:-}" ]]; then
   pids="$pids $(cat logs/mock8002.pid 2>/dev/null || true)"
 fi
 
-go run ./cmd/report "$OUT" | tee "$OUT/RESULTS.md"
+./bin/report "$OUT" | tee "$OUT/RESULTS.md"

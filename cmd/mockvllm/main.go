@@ -95,13 +95,15 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.HandleFunc("GET /metrics", s.metrics)
-	mux.HandleFunc("POST /reset", func(w http.ResponseWriter, _ *http.Request) {
+	reset := func(w http.ResponseWriter, _ *http.Request) {
 		s.cache.Reset()
 		s.promptToks.Store(0)
 		s.cachedToks.Store(0)
 		s.reqs.Store(0)
-		w.WriteHeader(http.StatusNoContent)
-	})
+		writeJSON(w, map[string]any{"success": true})
+	}
+	mux.HandleFunc("POST /reset", reset)
+	mux.HandleFunc("POST /reset_prefix_cache", reset) // vLLM's name (VLLM_SERVER_DEV_MODE=1)
 	// Fault injection for testing retries / health checks.
 	mux.HandleFunc("POST /admin/fault", func(w http.ResponseWriter, r *http.Request) {
 		rate, _ := strconv.ParseFloat(r.URL.Query().Get("rate"), 64)

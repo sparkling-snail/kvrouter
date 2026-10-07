@@ -1,6 +1,6 @@
 // Command bench drives an OpenAI-compatible endpoint with a multi-tenant,
-// multi-turn chat workload and reports TTFT, throughput and prefix-cache
-// hit rate.
+// multi-turn chat workload and reports TTFT, inter-token latency, throughput,
+// goodput under latency SLOs and prefix-cache hit rate.
 //
 // Workload shape (the case prefix-aware routing exists for):
 //   - T tenants, each with a long system prompt (RAG context, tool specs...)
@@ -40,6 +40,10 @@ type result struct {
 	Reason     string
 	Err        string
 	AssistText string
+	// Gaps between consecutive content chunks, in ms (one chunk is usually
+	// one token; speculative decoding can put several in one chunk).
+	ITL    []float64
+	Chunks int
 	// Router's belief vs reality: bytes of the prompt it expected to be
 	// cached (-1 if the router didn't say) and the prompt's length in bytes.
 	MatchedChars, PromptChars int
@@ -55,6 +59,16 @@ type IndexAccuracy struct {
 	StaleRate        float64 `json:"stale_rate"`
 }
 
+// Goodput counts requests that met every configured latency SLO
+// (errors count as misses). TPOT is per request: (E2E - TTFT) / (tokens - 1).
+type Goodput struct {
+	SLOTTFTms float64 `json:"slo_ttft_ms,omitempty"`
+	SLOTPOTms float64 `json:"slo_tpot_ms,omitempty"`
+	Met       int     `json:"met"`
+	Rate      float64 `json:"rate"`        // fraction of requests that met the SLOs
+	ReqPerSec float64 `json:"req_per_sec"` // SLO-meeting requests per second
+}
+
 type Summary struct {
 	Scenario      string             `json:"scenario"`
 	Policy        string             `json:"policy"`
@@ -65,6 +79,9 @@ type Summary struct {
 	OutTokPerSec  float64            `json:"output_tok_per_sec"`
 	PromptTokPerS float64            `json:"prompt_tok_per_sec"`
 	TTFTms        map[string]float64 `json:"ttft_ms"`
+	ITLms         map[string]float64 `json:"itl_ms"`
+	TPOTms        map[string]float64 `json:"tpot_ms"`
+	Goodput       *Goodput           `json:"goodput,omitempty"`
 	E2Ems         map[string]float64 `json:"e2e_ms"`
 	CacheHitRate  float64            `json:"cache_hit_rate"`
 	ScrapedHit    *float64           `json:"scraped_cache_hit_rate,omitempty"`
@@ -120,6 +137,8 @@ func main() {
 		out         = flag.String("out", "", "write JSON summary here")
 		scrape      = flag.String("scrape", "", "comma-separated backend URLs; diff vllm:prefix_cache_* counters")
 		timeout     = flag.Duration("timeout", 120*time.Second, "per-request timeout")
+		sloTTFT     = flag.Duration("slo-ttft", 0, "goodput SLO on time to first token (0 = no TTFT SLO)")
+		sloTPOT     = flag.Duration("slo-tpot", 0, "goodput SLO on time per output token after the first (0 = no TPOT SLO)")
 	)
 	flag.Parse()
 
@@ -188,7 +207,7 @@ func main() {
 	wg.Wait()
 	wall := time.Since(t0)
 
-	s := summarize(results, wall)
+	s := summarize(results, wall, *sloTTFT, *sloTPOT)
 	s.Scenario, s.Policy = *scenario, *policy
 	if after := scrapeAll(*scrape); before != nil && after != nil {
 		q := after[0] - before[0]
@@ -236,6 +255,7 @@ func do(client *http.Client, url, model string, msgs []msg, maxTokens int, t0 ti
 		return r
 	}
 	var out strings.Builder
+	var last time.Time
 	sc := bufio.NewScanner(resp.Body)
 	sc.Buffer(make([]byte, 64<<10), 1<<20)
 	done := false
@@ -268,9 +288,14 @@ func do(client *http.Client, url, model string, msgs []msg, maxTokens int, t0 ti
 		}
 		for _, c := range ch.Choices {
 			if c.Delta.Content != "" {
+				now := time.Now()
 				if r.TTFT == 0 {
-					r.TTFT = time.Since(start)
+					r.TTFT = now.Sub(start)
+				} else {
+					r.ITL = append(r.ITL, float64(now.Sub(last).Microseconds())/1000)
 				}
+				last = now
+				r.Chunks++
 				out.WriteString(c.Delta.Content)
 			}
 		}
@@ -309,12 +334,26 @@ func pct(xs []float64, p float64) float64 {
 	return xs[max(0, min(i, len(xs)-1))]
 }
 
-func summarize(rs []result, wall time.Duration) Summary {
+// tpot is the mean time per output token after the first, in ms; ok is
+// false when there is no second token to measure.
+func tpot(r result) (ms float64, ok bool) {
+	n := r.OutTok
+	if n == 0 {
+		n = r.Chunks
+	}
+	if n < 2 {
+		return 0, false
+	}
+	return float64((r.E2E - r.TTFT).Microseconds()) / 1000 / float64(n-1), true
+}
+
+func summarize(rs []result, wall time.Duration, sloTTFT, sloTPOT time.Duration) Summary {
 	s := Summary{
 		Requests: len(rs), WallSec: wall.Seconds(),
 		PerBackend: map[string]int{}, Reasons: map[string]int{}, Errs: map[string]int{},
 	}
-	var ttft, e2e []float64
+	var ttft, e2e, itl, tpots []float64
+	met := 0
 	var out, prompt, cached int
 	var idx *IndexAccuracy
 	var predictedTok float64
@@ -344,6 +383,15 @@ func summarize(rs []result, wall time.Duration) Summary {
 		b.ttft = append(b.ttft, ms)
 		ttft = append(ttft, ms)
 		e2e = append(e2e, float64(r.E2E.Microseconds())/1000)
+		itl = append(itl, r.ITL...)
+		tp, hasTP := tpot(r)
+		if hasTP {
+			tpots = append(tpots, tp)
+		}
+		if (sloTTFT == 0 || r.TTFT <= sloTTFT) &&
+			(sloTPOT == 0 || !hasTP || tp <= float64(sloTPOT.Microseconds())/1000) {
+			met++
+		}
 		out += r.OutTok
 		prompt += r.PromptTok
 		cached += r.CachedTok
@@ -373,6 +421,8 @@ func summarize(rs []result, wall time.Duration) Summary {
 	}
 	sort.Float64s(ttft)
 	sort.Float64s(e2e)
+	sort.Float64s(itl)
+	sort.Float64s(tpots)
 	mean := func(xs []float64) float64 {
 		t := 0.0
 		for _, x := range xs {
@@ -382,6 +432,20 @@ func summarize(rs []result, wall time.Duration) Summary {
 	}
 	s.TTFTms = map[string]float64{"mean": mean(ttft), "p50": pct(ttft, 50), "p90": pct(ttft, 90), "p99": pct(ttft, 99)}
 	s.E2Ems = map[string]float64{"mean": mean(e2e), "p50": pct(e2e, 50), "p99": pct(e2e, 99)}
+	s.ITLms = map[string]float64{"mean": mean(itl), "p50": pct(itl, 50), "p90": pct(itl, 90), "p99": pct(itl, 99)}
+	s.TPOTms = map[string]float64{"mean": mean(tpots), "p50": pct(tpots, 50), "p90": pct(tpots, 90), "p99": pct(tpots, 99)}
+	if sloTTFT > 0 || sloTPOT > 0 {
+		g := &Goodput{
+			SLOTTFTms: float64(sloTTFT.Microseconds()) / 1000,
+			SLOTPOTms: float64(sloTPOT.Microseconds()) / 1000,
+			Met:       met,
+			ReqPerSec: float64(met) / wall.Seconds(),
+		}
+		if len(rs) > 0 {
+			g.Rate = float64(met) / float64(len(rs))
+		}
+		s.Goodput = g
+	}
 	s.ReqPerSec = float64(len(rs)-s.Errors) / wall.Seconds()
 	s.OutTokPerSec = float64(out) / wall.Seconds()
 	s.PromptTokPerS = float64(prompt) / wall.Seconds()
@@ -425,6 +489,12 @@ func print(s Summary) {
 		s.Requests, s.Errors, s.WallSec, s.ReqPerSec, s.OutTokPerSec, s.PromptTokPerS)
 	fmt.Printf("TTFT ms: mean=%.0f p50=%.0f p90=%.0f p99=%.0f   E2E p50=%.0f p99=%.0f\n",
 		s.TTFTms["mean"], s.TTFTms["p50"], s.TTFTms["p90"], s.TTFTms["p99"], s.E2Ems["p50"], s.E2Ems["p99"])
+	fmt.Printf("ITL ms: p50=%.1f p90=%.1f p99=%.1f   TPOT ms: p50=%.1f p90=%.1f p99=%.1f\n",
+		s.ITLms["p50"], s.ITLms["p90"], s.ITLms["p99"], s.TPOTms["p50"], s.TPOTms["p90"], s.TPOTms["p99"])
+	if g := s.Goodput; g != nil {
+		fmt.Printf("goodput (SLO TTFT<=%.0fms TPOT<=%.0fms, 0=unset): %.1f req/s, %d/%d met (%.1f%%)\n",
+			g.SLOTTFTms, g.SLOTPOTms, g.ReqPerSec, g.Met, s.Requests, 100*g.Rate)
+	}
 	fmt.Printf("cache hit rate=%.1f%%", 100*s.CacheHitRate)
 	if s.ScrapedHit != nil {
 		fmt.Printf(" (scraped %.1f%%)", 100**s.ScrapedHit)
