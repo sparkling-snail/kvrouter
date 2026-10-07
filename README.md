@@ -15,9 +15,98 @@ turn one instance into a hot spot.
                         └───────────────────────────────────────────────────────────────┘
 ```
 
-Stdlib only, no dependencies. ~2,000 lines of Go (router, mock server, load generator) plus ~310 lines of tests; a small Python script turns the results into the tables and chart below.
+Stdlib only, no dependencies. ~2,000 lines of Go (router, mock server, load generator) plus ~310 lines of tests; small Python scripts turn the results into the tables and charts below.
 
-## Results (4 instances, mock vLLM, mean of 3 seeds)
+## Results on real GPUs (2× H100, vLLM 0.31.0)
+
+Two vLLM servers, one H100 80GB each, serving Qwen2.5-7B-Instruct, with
+`--gpu-memory-utilization 0.35` (≈198k tokens of KV cache per server). The
+workload: 100 tenants × 3k-token system prompts (≈300k tokens, 1.5× one
+server's cache), 600 conversations × 4 turns, 64 output tokens per request.
+Each policy was run at 48, 128 and 256 concurrent conversations, with caches
+reset between runs. **Goodput** = requests per second that met both SLOs:
+TTFT ≤ 500 ms and time per output token ≤ 25 ms.
+
+![Goodput vs concurrency by policy on 2× H100](docs/gpu_goodput.png)
+
+**Multi-tenant**: goodput, req/s (share of requests meeting the SLO)
+
+| policy | 48 concurrent | 128 concurrent | 256 concurrent |
+|---|---:|---:|---:|
+| round_robin | 56 (98%) | 34 (53%) | 25 (45%) |
+| least_loaded | 69 (99%) | 89 (83%) | 6 (11%) |
+| prefix_pure (no load bound) | 80 (99%) | 132 (95%) | 105 (70%) |
+| **prefix** (bounded load) | 80 (99%) | **134 (95%)** | **142 (85%)** |
+| weighted 3:2 (prefix:load) | 76 (99%) | 116 (95%) | 99 (76%) |
+| weighted 1:2 | 69 (98%) | 93 (86%) | 6 (10%) |
+
+**Hot tenant** (50% of conversations on one tenant)
+
+| policy | 48 concurrent | 128 concurrent | 256 concurrent |
+|---|---:|---:|---:|
+| round_robin | 69 (99%) | 86 (87%) | 40 (48%) |
+| least_loaded | 78 (99%) | 120 (93%) | 109 (73%) |
+| prefix_pure (no load bound) | 76 (99%) | 116 (94%) | 46 (38%) |
+| **prefix** (bounded load) | 84 (99%) | **143 (95%)** | **147 (84%)** |
+| weighted 3:2 (prefix:load) | 83 (99%) | 139 (95%) | 138 (85%) |
+| weighted 1:2 | 78 (99%) | 123 (93%) | 108 (72%) |
+
+**Multi-tenant at 256 concurrent**
+
+| policy | TTFT p50 | TTFT p90 | ITL p99 | TPOT p90 | req/s | goodput | cache hit | load imbalance |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| round_robin | 1509 ms | 4537 ms | 197 ms | 52.1 ms | 56.3 | 25.2 (45%) | 66.6% | 1.00 |
+| least_loaded | 1221 ms | 2306 ms | 195 ms | 52.6 ms | 59.5 | 6.4 (11%) | 62.5% | 1.09 |
+| prefix_pure (no load bound) | 239 ms | 895 ms | 163 ms | 28.7 ms | 149.7 | 105.5 (70%) | 93.1% | 1.08 |
+| **prefix** (bounded load) | 196 ms | 682 ms | 133 ms | 21.0 ms | 166.7 | 142.3 (85%) | 93.4% | 1.01 |
+| weighted 3:2 (prefix:load) | 198 ms | 782 ms | 188 ms | 30.2 ms | 130.9 | 99.2 (76%) | 88.5% | 1.03 |
+| weighted 1:2 | 1329 ms | 2486 ms | 195 ms | 53.3 ms | 57.3 | 5.5 (10%) | 60.5% | 1.10 |
+
+### What the GPU numbers say
+
+- **At light load, routing barely matters.** At 48 concurrent every policy meets
+  the SLO for ~99% of requests; `prefix` only adds throughput (80 vs 56 req/s
+  for round-robin). H100 prefill is fast enough that cache misses are cheap
+  until the GPUs are busy.
+- **The gap opens under load.** At 128 concurrent, `prefix` delivers 3.9× the
+  goodput of round-robin and 1.5× least-loaded on the multi-tenant workload. At
+  256 it holds 142 req/s while least-loaded collapses to 6: spreading requests
+  by in-flight count scatters each conversation's turns across both servers,
+  so its hit rate (62.5%) falls below even round-robin's and TTFT p50 passes a
+  second.
+- **The load bound earns its keep under skew, as in the simulator.** On the hot
+  tenant at 256 concurrent, pure affinity sends 1.56× its share to one server
+  and only 38% of requests meet the SLO; bounded load keeps balance at 1.03 and
+  gets 3.2× the goodput (147 vs 46 req/s).
+- **Weighted scoring again matches on skew but not on uniform load:** 138 vs 147
+  req/s on the hot tenant, 99 vs 142 on the 100-tenant workload, where cold prompts land wherever load is lowest and the hit rate drops
+  (88.5% vs 93.4%).
+- **Decode latency improves too, which the simulator couldn't show.** At 256
+  concurrent, `prefix` has TPOT p90 of 21 ms against ~52 ms for round-robin and
+  least-loaded, and ITL p99 of 133 vs ~195 ms. Likely cause: fewer uncached
+  tokens to prefill means fewer prefill chunks interleaved with decode steps.
+- **The measurements are consistent.** Across all 48 runs (115,200 requests)
+  there were no errors, the client-reported cache hit rate equals vLLM's own
+  `vllm:prefix_cache_*` counters exactly, and none of the requests the router
+  expected to be warm were stale. A repeat of the 48-concurrent pass matched the
+  first within 0.6% on throughput.
+- **The router underestimates its hits** (predicted 86% vs actual 93% for
+  `prefix`). That's probably by design: it doesn't count the 200-token header
+  every tenant shares (the minimum-match rule), which vLLM still reuses.
+
+Raw results, `meta.json` and logs: [`results/gpu/`](results/gpu/); regenerate the
+tables and chart with `.venv/bin/python scripts/summarize_gpu.py`. Failover was
+not run on GPUs.
+
+**Simulator vs real GPUs.** The simulator ran 4 servers with a slow simulated
+prefill (~10k tok/s), so routing mattered even at 48 concurrent (4.2× round-robin
+throughput there, vs 1.4× on 2× H100). The setups differ, so the absolute
+numbers don't compare. What carried over is the ranking: `prefix` is best or
+tied in every scenario at every load that stresses the GPUs, the load bound is
+what saves it under skew, and `weighted` falls behind on uniform load because of
+cold placement.
+
+## Simulator results (4 instances, mock vLLM, mean of 3 seeds)
 
 ![Throughput and TTFT p50 by policy, multi-tenant and hot-tenant scenarios](docs/results.png)
 
@@ -96,7 +185,7 @@ to land 16 tenants.
   `results/seed*/RESULTS.md` — p50 TTFT is ~0.8–1.3 s in second 0 and settles to ~15–60 ms once warm).
 - **ITL says little here.** It's ~12 ms at p50 for every policy because the mock's decode
   step only slows with batch size; prefills never stall decoding, as they do in real vLLM.
-  Treat the ITL columns as a placeholder until the real-GPU run (`scripts/gpu_run.sh`).
+  See the GPU results above for ITL and TPOT that mean something.
 
 ### How accurate is the router's index?
 
@@ -120,10 +209,10 @@ points, and shrinking the index to the cache's size only partly helps: the
 router and the engine evict in different orders. That's the case for building
 the index from the engine's own KV-cache events (see Limitations).
 
-> **Caveat:** these are from a simulator, not GPUs. `cmd/mockvllm` models an
-> LRU prefix cache with vLLM's 16-token blocks, serialized prefill at ~10k
-> tok/s, and batch-dependent decode. The *relative* effects are the point; the
-> absolute numbers are not a vLLM benchmark. See "Running against real vLLM".
+> **Caveat:** the simulator results and the index-drift numbers come from
+> `cmd/mockvllm`, not GPUs. It models an LRU prefix cache with vLLM's 16-token
+> blocks, serialized prefill at ~10k tok/s, and batch-dependent decode. The
+> *relative* effects are the point; for real vLLM numbers see the GPU results above.
 
 ## Design
 
@@ -214,6 +303,7 @@ internal/router policies, proxy, health, metrics (+ tests)
 scripts/bench.sh        full comparison + failover run (bash 3.2+, works on stock macOS)
 scripts/index_drift.sh  router-index accuracy under KV-cache memory pressure
 scripts/summarize.py    mean across seeds → README tables + docs/results.png
+scripts/summarize_gpu.py  GPU load sweep → README tables + docs/gpu_goodput.png
 scripts/gpu_run.sh      the same comparison against real vLLM on one GPU host
 deploy/                 Dockerfile, docker-compose for 4 pinned vLLM servers
 ```
@@ -239,12 +329,18 @@ Fault injection on the mock: `POST /admin/fault?rate=0.2` (random 503s),
 
 ## Running against real vLLM
 
-**Not yet run — that needs GPUs.** On a host with 2–4 NVIDIA GPUs, docker and
-nvidia-container-toolkit:
+On a host with 2–4 NVIDIA GPUs, docker and nvidia-container-toolkit (e.g. a
+Lambda Cloud instance with Lambda Stack):
 
 ```bash
 HF_TOKEN=hf_... scripts/gpu_run.sh                     # 4 GPUs, Qwen2.5-7B-Instruct
 NUM_GPUS=2 MODEL=meta-llama/Llama-3.1-8B-Instruct scripts/gpu_run.sh
+
+# the load sweep behind the GPU results above (~25 min on 2× H100)
+for c in 48 128 256; do
+  OUT=results/gpu/h100x2_c$c CONCURRENCY=$c SLO_TTFT=500ms SLO_TPOT=25ms \
+  NUM_GPUS=2 GPU_MEM_UTIL=0.35 scripts/gpu_run.sh 2>&1 | tee run_c$c.log
+done
 ```
 
 It checks the host, starts that many vLLM servers from
@@ -255,7 +351,9 @@ healthy, then runs every policy with caches reset in between
 vLLM version, GPUs and benchmark arguments. Go is optional on the host.
 
 The workload is sized from the KV-cache capacity vLLM logs at startup: distinct
-prefixes come to about half the fleet's cache, more than one server holds.
+prefixes come to about half the fleet's cache, and at least 1.5 servers' worth.
+On large GPUs, lower `GPU_MEM_UTIL` to keep the workload (and the run) small;
+on 80 GB cards the default 0.9 would mean hours per pass.
 That's the regime this router is for. If everything fits on every instance,
 round-robin hit rates converge with prefix routing. Override with `TENANTS`,
 `SYS_TOKENS`, `CONVS`, `MAX_TOKENS`, `SLO_TTFT` and `SLO_TPOT`. The failover

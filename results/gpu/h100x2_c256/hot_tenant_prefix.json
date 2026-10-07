@@ -1,0 +1,138 @@
+{
+  "scenario": "hot_tenant",
+  "policy": "prefix",
+  "requests": 2400,
+  "errors": 0,
+  "wall_sec": 13.628119432,
+  "req_per_sec": 176.10646956649006,
+  "output_tok_per_sec": 11270.814052255364,
+  "prompt_tok_per_sec": 534183.1671144691,
+  "ttft_ms": {
+    "mean": 335.30597916666676,
+    "p50": 201.625,
+    "p90": 641.052,
+    "p99": 2249.498
+  },
+  "itl_ms": {
+    "mean": 15.308140245284392,
+    "p50": 11.639,
+    "p90": 18.661,
+    "p99": 142.061
+  },
+  "tpot_ms": {
+    "mean": 15.190864801587322,
+    "p50": 13.66457142857143,
+    "p90": 21.21049206349206,
+    "p99": 39.84006349206349
+  },
+  "goodput": {
+    "slo_ttft_ms": 500,
+    "slo_tpot_ms": 25,
+    "met": 2006,
+    "rate": 0.8358333333333333,
+    "req_per_sec": 147.1956574793246
+  },
+  "e2e_ms": {
+    "mean": 1292.3309729166674,
+    "p50": 1104.525,
+    "p99": 3087.976
+  },
+  "cache_hit_rate": 0.9381388126669663,
+  "scraped_cache_hit_rate": 0.9381388126669663,
+  "index_accuracy": {
+    "predicted_hit_rate": 0.8206600798524093,
+    "predicted_warm": 2107,
+    "stale": 0,
+    "stale_rate": 0
+  },
+  "per_backend": {
+    ":8001": 1159,
+    ":8002": 1241
+  },
+  "imbalance_max_over_mean": 1.0341666666666667,
+  "route_reasons": {
+    "hash_affinity": 279,
+    "load_fallback": 14,
+    "prefix_hit": 2107
+  },
+  "timeline": [
+    {
+      "sec": 0,
+      "ok": 256,
+      "err": 0,
+      "ttft_p50_ms": 1665.96
+    },
+    {
+      "sec": 2,
+      "ok": 92,
+      "err": 0,
+      "ttft_p50_ms": 246.802
+    },
+    {
+      "sec": 3,
+      "ok": 231,
+      "err": 0,
+      "ttft_p50_ms": 326.262
+    },
+    {
+      "sec": 4,
+      "ok": 272,
+      "err": 0,
+      "ttft_p50_ms": 268.471
+    },
+    {
+      "sec": 5,
+      "ok": 194,
+      "err": 0,
+      "ttft_p50_ms": 238.357
+    },
+    {
+      "sec": 6,
+      "ok": 167,
+      "err": 0,
+      "ttft_p50_ms": 137.823
+    },
+    {
+      "sec": 7,
+      "ok": 211,
+      "err": 0,
+      "ttft_p50_ms": 158.851
+    },
+    {
+      "sec": 8,
+      "ok": 259,
+      "err": 0,
+      "ttft_p50_ms": 187.574
+    },
+    {
+      "sec": 9,
+      "ok": 245,
+      "err": 0,
+      "ttft_p50_ms": 187.107
+    },
+    {
+      "sec": 10,
+      "ok": 189,
+      "err": 0,
+      "ttft_p50_ms": 186.301
+    },
+    {
+      "sec": 11,
+      "ok": 108,
+      "err": 0,
+      "ttft_p50_ms": 74.919
+    },
+    {
+      "sec": 12,
+      "ok": 152,
+      "err": 0,
+      "ttft_p50_ms": 53.673
+    },
+    {
+      "sec": 13,
+      "ok": 24,
+      "err": 0,
+      "ttft_p50_ms": 55.947
+    }
+  ]
+}

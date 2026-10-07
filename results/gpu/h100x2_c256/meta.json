@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-07T15:57:36Z",
+  "git": "18eda3b",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "vllm_image": "vllm/vllm-openai:v0.31.0",
+  "vllm_version": [{"version":"0.31.0"},{"version":"0.31.0"}],
+  "gpus": ["NVIDIA H100 80GB HBM3, 81559 MiB, 580.105.08","NVIDIA H100 80GB HBM3, 81559 MiB, 580.105.08"],
+  "num_servers": 2,
+  "kv_cache_tokens_per_server": 198320,
+  "seed": 1,
+  "bench_args": "-tenants 100 -sys-tokens 3000 -convs 600 -max-tokens 64 -concurrency 256 -slo-ttft 500ms -slo-tpot 25ms -timeout 300s"
+}
