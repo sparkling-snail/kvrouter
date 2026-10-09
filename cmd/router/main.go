@@ -21,7 +21,7 @@ func main() {
 	var (
 		listen      = flag.String("listen", ":9000", "listen address")
 		backends    = flag.String("backends", "http://127.0.0.1:8001,http://127.0.0.1:8002", "comma-separated backend base URLs")
-		policyName  = flag.String("policy", "prefix", "routing policy: prefix | weighted | round_robin | least_loaded")
+		policyName  = flag.String("policy", "prefix", "routing policy: prefix | weighted | round_robin | least_loaded | p2c | random")
 		blockChars  = flag.Int("block-chars", 128, "prefix hash block size in bytes (~32 tokens)")
 		indexBlocks = flag.Int("index-blocks", 4096, "per-backend LRU capacity of the router's prefix index")
 		loadFactor  = flag.Float64("load-factor", 1.25, "bounded-load factor c: a backend may hold at most ceil(c*avg)+slack in-flight; <=0 disables (pure affinity)")
@@ -67,6 +67,10 @@ func main() {
 		policy = router.NewRoundRobin(pool)
 	case "least_loaded", "ll":
 		policy = router.NewLeastLoaded(pool)
+	case "p2c":
+		policy = router.NewPowerOfTwo(pool)
+	case "random":
+		policy = router.NewRandom(pool)
 	default:
 		fmt.Fprintln(os.Stderr, "unknown policy:", *policyName)
 		os.Exit(2)

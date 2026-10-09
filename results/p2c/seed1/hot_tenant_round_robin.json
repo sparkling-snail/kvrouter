@@ -1,0 +1,126 @@
+{
+  "scenario": "hot_tenant",
+  "policy": "round_robin",
+  "requests": 512,
+  "errors": 0,
+  "wall_sec": 11.162985379,
+  "req_per_sec": 45.865866756681704,
+  "output_tok_per_sec": 733.8538681069073,
+  "prompt_tok_per_sec": 156779.47615092006,
+  "ttft_ms": {
+    "mean": 727.5490449218748,
+    "p50": 658.348,
+    "p90": 1472.05,
+    "p99": 1783.42
+  },
+  "itl_ms": {
+    "mean": 12.539977213541635,
+    "p50": 12.595,
+    "p90": 13.615,
+    "p99": 14.653
+  },
+  "tpot_ms": {
+    "mean": 12.542371484375012,
+    "p50": 12.636866666666666,
+    "p90": 13.49,
+    "p99": 14.463799999999999
+  },
+  "goodput": {
+    "slo_ttft_ms": 500,
+    "slo_tpot_ms": 25,
+    "met": 181,
+    "rate": 0.353515625,
+    "req_per_sec": 16.214300552655054
+  },
+  "e2e_ms": {
+    "mean": 915.6851542968748,
+    "p50": 849.978,
+    "p99": 1970.784
+  },
+  "cache_hit_rate": 0.788194228190297,
+  "scraped_cache_hit_rate": 0.788194228190297,
+  "index_accuracy": {
+    "predicted_hit_rate": 0,
+    "predicted_warm": 0,
+    "stale": 0,
+    "stale_rate": 0
+  },
+  "per_backend": {
+    ":8001": 128,
+    ":8002": 128,
+    ":8003": 128,
+    ":8004": 128
+  },
+  "imbalance_max_over_mean": 1,
+  "route_reasons": {
+    "round_robin": 512
+  },
+  "timeline": [
+    {
+      "sec": 0,
+      "ok": 67,
+      "err": 0,
+      "ttft_p50_ms": 1016.055
+    },
+    {
+      "sec": 1,
+      "ok": 43,
+      "err": 0,
+      "ttft_p50_ms": 556.15
+    },
+    {
+      "sec": 2,
+      "ok": 78,
+      "err": 0,
+      "ttft_p50_ms": 605.246
+    },
+    {
+      "sec": 3,
+      "ok": 31,
+      "err": 0,
+      "ttft_p50_ms": 508.039
+    },
+    {
+      "sec": 4,
+      "ok": 64,
+      "err": 0,
+      "ttft_p50_ms": 744.432
+    },
+    {
+      "sec": 5,
+      "ok": 43,
+      "err": 0,
+      "ttft_p50_ms": 820.58
+    },
+    {
+      "sec": 6,
+      "ok": 56,
+      "err": 0,
+      "ttft_p50_ms": 646.923
+    },
+    {
+      "sec": 7,
+      "ok": 43,
+      "err": 0,
+      "ttft_p50_ms": 935.253
+    },
+    {
+      "sec": 8,
+      "ok": 44,
+      "err": 0,
+      "ttft_p50_ms": 444.268
+    },
+    {
+      "sec": 9,
+      "ok": 22,
+      "err": 0,
+      "ttft_p50_ms": 228.908
+    },
+    {
+      "sec": 10,
+      "ok": 21,
+      "err": 0,
+      "ttft_p50_ms": 31.459
+    }
+  ]
+}

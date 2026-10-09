@@ -3,10 +3,12 @@
 #   scenario multi_tenant : 16 tenants, uniform traffic
 #   scenario hot_tenant   : 50% of conversations hit one tenant
 #   policies              : round_robin, least_loaded, prefix_pure (no load bound), prefix,
-#                           weighted (prefix:load = 3:2), weighted_load (1:2)
+#                           weighted (prefix:load = 3:2), weighted_load (1:2);
+#                           also random and p2c (power of two choices) via POLICIES
 #   scenario failover     : prefix policy; kill -9 one backend mid-run, restart it later
 # Results land in $OUT/*.json (default results/); a markdown table is printed at the end.
 #   SEED=2 OUT=results/seed2 scripts/bench.sh     # one seed into its own directory
+#   POLICIES="random p2c least_loaded" NO_FAILOVER=1 scripts/bench.sh   # a subset of policies
 #
 # To run against real vLLM instead, skip the mocks and set BACKENDS, e.g.
 #   BACKENDS=http://gpu1:8000,http://gpu2:8000 MODEL=meta-llama/Llama-3.1-8B-Instruct NO_MOCK=1 scripts/bench.sh
@@ -67,18 +69,30 @@ run() { # scenario label "router args" bench-args...
   echo
 }
 
+POLICIES=${POLICIES:-round_robin least_loaded prefix_pure prefix weighted weighted_load}
+router_args() {
+  case $1 in
+    round_robin)   echo "-policy round_robin" ;;
+    random)        echo "-policy random" ;;
+    p2c)           echo "-policy p2c" ;;
+    least_loaded)  echo "-policy least_loaded" ;;
+    prefix_pure)   echo "-policy prefix -load-factor 0" ;;
+    prefix)        echo "-policy prefix" ;;
+    weighted)      echo "-policy weighted -prefix-weight 3 -load-weight 2" ;;
+    weighted_load) echo "-policy weighted -prefix-weight 1 -load-weight 2" ;;
+    *) echo "unknown policy label: $1" >&2; exit 2 ;;
+  esac
+}
+
 for scenario in multi_tenant hot_tenant; do
   extra="-hot-frac 0"
   [[ $scenario == hot_tenant ]] && extra="-hot-frac 0.5"
-  run $scenario round_robin   "-policy round_robin"                           $extra
-  run $scenario least_loaded  "-policy least_loaded"                          $extra
-  run $scenario prefix_pure   "-policy prefix -load-factor 0"                 $extra
-  run $scenario prefix        "-policy prefix"                                $extra
-  run $scenario weighted      "-policy weighted -prefix-weight 3 -load-weight 2" $extra
-  run $scenario weighted_load "-policy weighted -prefix-weight 1 -load-weight 2" $extra
+  for label in $POLICIES; do
+    run $scenario "$label" "$(router_args "$label")" $extra
+  done
 done
 
-if [[ -z "${NO_MOCK:-}" ]]; then
+if [[ -z "${NO_MOCK:-}" && -z "${NO_FAILOVER:-}" ]]; then
   # Failover: kill -9 backend 8002 at t=2s (in-flight streams die), restart at t=6s.
   (
     sleep 2;  kill -9 "$(cat logs/mock8002.pid)"; echo ">>> killed :8002" >&2

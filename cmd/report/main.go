@@ -43,7 +43,7 @@ type summary struct {
 	Errs map[string]int `json:"error_samples"`
 }
 
-var order = map[string]int{"round_robin": 0, "least_loaded": 1, "prefix_pure": 2, "prefix": 3, "weighted": 4, "weighted_load": 5}
+var order = map[string]int{"round_robin": 0, "random": 1, "p2c": 2, "least_loaded": 3, "prefix_pure": 4, "prefix": 5, "weighted": 6, "weighted_load": 7}
 
 func main() {
 	dir := "results"

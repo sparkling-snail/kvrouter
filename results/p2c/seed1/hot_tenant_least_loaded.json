@@ -1,0 +1,108 @@
+{
+  "scenario": "hot_tenant",
+  "policy": "least_loaded",
+  "requests": 512,
+  "errors": 0,
+  "wall_sec": 7.506713877,
+  "req_per_sec": 68.20561012305652,
+  "output_tok_per_sec": 1091.2897619689043,
+  "prompt_tok_per_sec": 233127.17504285398,
+  "ttft_ms": {
+    "mean": 386.36539257812484,
+    "p50": 279.996,
+    "p90": 922.719,
+    "p99": 1629.931
+  },
+  "itl_ms": {
+    "mean": 12.322719531249977,
+    "p50": 12.387,
+    "p90": 12.926,
+    "p99": 13.383
+  },
+  "tpot_ms": {
+    "mean": 12.324991015625008,
+    "p50": 12.454933333333335,
+    "p90": 12.624133333333333,
+    "p99": 12.738466666666666
+  },
+  "goodput": {
+    "slo_ttft_ms": 500,
+    "slo_tpot_ms": 25,
+    "met": 339,
+    "rate": 0.662109375,
+    "req_per_sec": 45.15957389007062
+  },
+  "e2e_ms": {
+    "mean": 571.2407265625001,
+    "p50": 467.727,
+    "p99": 1818.576
+  },
+  "cache_hit_rate": 0.8711219706757469,
+  "scraped_cache_hit_rate": 0.8711219706757469,
+  "index_accuracy": {
+    "predicted_hit_rate": 0,
+    "predicted_warm": 0,
+    "stale": 0,
+    "stale_rate": 0
+  },
+  "per_backend": {
+    ":8001": 119,
+    ":8002": 140,
+    ":8003": 121,
+    ":8004": 132
+  },
+  "imbalance_max_over_mean": 1.09375,
+  "route_reasons": {
+    "least_loaded": 512
+  },
+  "timeline": [
+    {
+      "sec": 0,
+      "ok": 64,
+      "err": 0,
+      "ttft_p50_ms": 976.679
+    },
+    {
+      "sec": 1,
+      "ok": 97,
+      "err": 0,
+      "ttft_p50_ms": 36.155
+    },
+    {
+      "sec": 2,
+      "ok": 71,
+      "err": 0,
+      "ttft_p50_ms": 836.967
+    },
+    {
+      "sec": 3,
+      "ok": 68,
+      "err": 0,
+      "ttft_p50_ms": 325.021
+    },
+    {
+      "sec": 4,
+      "ok": 105,
+      "err": 0,
+      "ttft_p50_ms": 278.994
+    },
+    {
+      "sec": 5,
+      "ok": 71,
+      "err": 0,
+      "ttft_p50_ms": 37.554
+    },
+    {
+      "sec": 6,
+      "ok": 34,
+      "err": 0,
+      "ttft_p50_ms": 19.722
+    },
+    {
+      "sec": 7,
+      "ok": 2,
+      "err": 0,
+      "ttft_p50_ms": 12.593
+    }
+  ]
+}

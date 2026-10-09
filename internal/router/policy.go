@@ -2,6 +2,7 @@ package router
 
 import (
 	"math"
+	"math/rand/v2"
 	"sync/atomic"
 
 	"github.com/sparkling-snail/kvrouter/internal/prefix"
@@ -74,6 +75,56 @@ func leastLoaded(cands []*Backend, rot *atomic.Uint64) *Backend {
 		}
 	}
 	return best
+}
+
+// -------------------------------------------------------------------- random
+
+// Random sends each request to a uniformly random healthy backend: the
+// "one random choice" baseline from balls-into-bins.
+type Random struct{ pool *Pool }
+
+func NewRandom(p *Pool) *Random              { return &Random{pool: p} }
+func (r *Random) Name() string               { return "random" }
+func (r *Random) Observe(*Backend, []uint64) {}
+
+func (r *Random) Pick(_ []uint64, exclude map[int]bool) Decision {
+	cands, panicMode := r.pool.candidates(exclude)
+	if len(cands) == 0 {
+		return Decision{}
+	}
+	return Decision{Backend: cands[rand.IntN(len(cands))], Reason: withPanic("random", panicMode)}
+}
+
+// ---------------------------------------------------------- power of two
+
+// PowerOfTwo samples two distinct healthy backends at random and picks the
+// one with fewer in-flight requests (Mitzenmacher's "power of two choices",
+// Envoy's LEAST_REQUEST default). With two backends it checks both, so it
+// behaves like least_loaded; with more it only ever looks at two.
+type PowerOfTwo struct{ pool *Pool }
+
+func NewPowerOfTwo(p *Pool) *PowerOfTwo           { return &PowerOfTwo{pool: p} }
+func (p2 *PowerOfTwo) Name() string               { return "p2c" }
+func (p2 *PowerOfTwo) Observe(*Backend, []uint64) {}
+
+func (p2 *PowerOfTwo) Pick(_ []uint64, exclude map[int]bool) Decision {
+	cands, panicMode := p2.pool.candidates(exclude)
+	if len(cands) == 0 {
+		return Decision{}
+	}
+	if len(cands) == 1 {
+		return Decision{Backend: cands[0], Reason: withPanic("p2c", panicMode)}
+	}
+	i := rand.IntN(len(cands))
+	j := rand.IntN(len(cands) - 1)
+	if j >= i {
+		j++ // distinct second sample
+	}
+	a, b := cands[i], cands[j]
+	if b.Inflight() < a.Inflight() {
+		a = b
+	}
+	return Decision{Backend: a, Reason: withPanic("p2c", panicMode)}
 }
 
 // -------------------------------------------------------------- prefix aware

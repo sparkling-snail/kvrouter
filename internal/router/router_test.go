@@ -182,6 +182,46 @@ func newTestProxy(t *testing.T, backends ...string) *Proxy {
 		pool, NewRoundRobin(pool))
 }
 
+func TestPowerOfTwoAvoidsBusiestBackend(t *testing.T) {
+	pool := NewPool(urls(4), 1000)
+	for i, b := range pool.Backends {
+		b.inflight.Store(int64(i)) // b3 is the busiest
+	}
+	p2 := NewPowerOfTwo(pool)
+	seen := map[int]int{}
+	for i := 0; i < 2000; i++ {
+		seen[p2.Pick(nil, nil).Backend.ID]++
+	}
+	if seen[3] != 0 {
+		t.Fatalf("busiest backend can never win a two-way comparison, got %d picks", seen[3])
+	}
+	// b0 wins every pair it is in: 3 of the 6 distinct pairs.
+	if seen[0] < 800 || seen[0] > 1200 {
+		t.Fatalf("least loaded backend should win ~half the picks, got %d/2000", seen[0])
+	}
+	// Two backends: two choices = least loaded.
+	two := NewPool(urls(2), 1000)
+	two.Backends[0].inflight.Store(5)
+	if got := NewPowerOfTwo(two).Pick(nil, nil).Backend; got != two.Backends[1] {
+		t.Fatalf("with 2 backends p2c should always pick the idler one")
+	}
+}
+
+func TestRandomSpreadsUniformly(t *testing.T) {
+	pool := NewPool(urls(4), 1000)
+	pool.Backends[0].inflight.Store(100) // load is ignored
+	r := NewRandom(pool)
+	seen := map[int]int{}
+	for i := 0; i < 4000; i++ {
+		seen[r.Pick(nil, nil).Backend.ID]++
+	}
+	for id := 0; id < 4; id++ {
+		if seen[id] < 800 || seen[id] > 1200 {
+			t.Fatalf("backend %d got %d/4000 picks, want ~1000", id, seen[id])
+		}
+	}
+}
+
 func TestRetryOn503ThenSucceeds(t *testing.T) {
 	var badHits atomic.Int64
 	bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
