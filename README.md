@@ -187,6 +187,56 @@ to land 16 tenants.
   step only slows with batch size; prefills never stall decoding, as they do in real vLLM.
   See the GPU results above for ITL and TPOT that mean something.
 
+### Random and two choices
+
+To check how the classic load-balancing baselines do here, the router also has
+`-policy random` (one random choice) and `-policy p2c` (power of two choices:
+sample two backends, take the one with fewer in-flight requests). This was a
+separate run on a different machine (`POLICIES="round_robin random p2c
+least_loaded prefix" NO_FAILOVER=1`, 3 seeds, same workloads as above), so
+compare rows within these tables, not with the tables above.
+
+**Multi-tenant**
+
+| policy | TTFT p50 | TTFT p90 | TTFT p99 | req/s | vs RR | goodput | cache hit | load imbalance |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| round_robin | 1058 ms | 3179 ms | 4007 ms | 27.1 | 1.00× | 8.8 (33%) | 64.3% | 1.00 |
+| random | 952 ms | 3111 ms | 4246 ms | 27.4 | 1.01× | 8.7 (32%) | 65.8% | 1.08 |
+| p2c (two choices) | 960 ms | 1858 ms | 2790 ms | 35.2 | 1.30× | 6.9 (20%) | 69.0% | 1.10 |
+| least_loaded | 290 ms | 1486 ms | 2537 ms | 58.0 | 2.14× | 36.2 (62%) | 83.0% | 1.15 |
+| **prefix** (bounded load) | 18 ms | 751 ms | 1654 ms | 106.1 | 3.92× | 89.4 (84%) | 92.6% | 1.12 |
+
+**Hot tenant**
+
+| policy | TTFT p50 | TTFT p90 | TTFT p99 | req/s | vs RR | goodput | cache hit | load imbalance |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| round_robin | 591 ms | 1274 ms | 1810 ms | 51.3 | 1.00× | 21.9 (42%) | 81.1% | 1.00 |
+| random | 547 ms | 1854 ms | 2669 ms | 45.1 | 0.88× | 21.7 (48%) | 80.9% | 1.06 |
+| p2c (two choices) | 529 ms | 1229 ms | 1911 ms | 54.6 | 1.07× | 26.1 (48%) | 81.4% | 1.16 |
+| least_loaded | 187 ms | 882 ms | 1822 ms | 78.7 | 1.53× | 56.7 (72%) | 88.5% | 1.12 |
+| **prefix** (bounded load) | 19 ms | 639 ms | 1549 ms | 112.4 | 2.19× | 98.0 (87%) | 93.1% | 1.34 |
+
+- **Two choices beats random, as the theory says.** On the multi-tenant
+  workload it cuts TTFT p90 from 3.1 s to 1.9 s and raises throughput 28%.
+- **But fewer of its requests meet the SLO** (20% vs 32%). TPOT is fine for
+  every policy, so the difference is TTFT: random leaves some instances idle and
+  a few lucky requests start at once, while two choices evens out the queues so
+  most requests wait about a second. The tail improves; the share under 500 ms
+  falls.
+- **Checking every backend beats checking two** (58 vs 35 req/s). The usual
+  case for two choices is cost and herding on stale load data across many
+  balancers. Neither applies to one router with exact in-flight counts and 4
+  backends. Least-loaded also gets accidental cache affinity: an instance that
+  has a prompt cached finishes sooner, its count drops, and it gets the next
+  request (83.0% vs 69.0% hit rate).
+- **None of the load-only policies come close to `prefix`.** Most of their
+  requests still prefill a 3k-token prompt from scratch. `prefix` serves 3× the
+  throughput of two choices and 13× its goodput.
+- **On 2 GPUs, two choices checks both backends,** so it should behave like
+  `least_loaded`. `random` and `p2c` have not been run on GPUs yet.
+
+Raw results: [`results/p2c/seed{1,2,3}/`](results/p2c/).
+
 ### How accurate is the router's index?
 
 The router only *guesses* what each backend has cached (it records what it
@@ -266,6 +316,14 @@ One consequence of min-max normalization, pinned down in
 `TestWeightedTradesCacheForLoad`: if the prefix weight exceeds the load weight,
 a backend holding the full prefix wins no matter how busy it is.
 
+### Baselines: random and two choices (`-policy random`, `-policy p2c`)
+`random` picks a uniformly random healthy backend. `p2c` samples two distinct
+healthy backends and takes the one with fewer in-flight requests, as Envoy's
+`LEAST_REQUEST` does by default. Neither looks at the prefix index. Tests:
+`TestPowerOfTwoAvoidsBusiestBackend` (the busiest backend can never win a
+comparison; with two backends, `p2c` always picks the idler one) and
+`TestRandomSpreadsUniformly`.
+
 ### Failure handling (`internal/router/proxy.go`, `pool.go`)
 - **Retries only before the first byte.** Once tokens have streamed to the
   client, replaying on another backend would duplicate output, so mid-stream
@@ -314,6 +372,7 @@ deploy/                 Dockerfile, docker-compose for 4 pinned vLLM servers
 make test                      # go vet + go test -race (also run in CI)
 ./scripts/bench.sh             # ~2 min: 2 scenarios × 6 policies + failover, prints tables
 make seeds drift summary       # ~8 min: everything behind the README numbers and chart
+POLICIES="random p2c least_loaded" NO_FAILOVER=1 ./scripts/bench.sh   # any subset of policies
 
 # by hand
 go build -o bin/ ./cmd/...
